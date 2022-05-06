@@ -14,11 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module type G = sig
-  include Git.S
-
-  val v : ?dotgit:Fpath.t -> Fpath.t -> (t, error) result Lwt.t
-end
+module type G = Irmin_git.G
 
 module type S = sig
   include
@@ -32,7 +28,7 @@ end
 module type Backend = sig
   (* FIXME: remove signature duplication *)
 
-  module G : Irmin_git.G
+  module G : G
 
   type endpoint = Mimic.ctx * Smart_git.Endpoint.t
 
@@ -40,7 +36,8 @@ module type Backend = sig
       (Schema : Irmin_git.Schema.S
                   with type Hash.t = G.hash
                    and type Node.t = G.Value.Tree.t
-                   and type Commit.t = G.Value.Commit.t) :
+                   and type Commit.t = G.Value.Commit.t
+                   and type Info.t = G.Info.t) :
     S
       with module Git = G
        and type Backend.Remote.endpoint = endpoint
@@ -51,7 +48,7 @@ module type Backend = sig
       with module Git = G
        and type Schema.Contents.t = C.t
        and type Schema.Metadata.t = Irmin_git.Metadata.t
-       and type Schema.Info.t = Irmin.Info.default
+       and type Schema.Info.t = G.Info.t
        and type Schema.Path.step = string
        and type Schema.Path.t = string list
        and type Schema.Hash.t = G.hash
@@ -63,7 +60,7 @@ module type Backend = sig
       with module Git = G
        and type Schema.Contents.t = C.t
        and type Schema.Metadata.t = Irmin_git.Metadata.t
-       and type Schema.Info.t = Irmin.Info.default
+       and type Schema.Info.t = G.Info.t
        and type Schema.Path.step = string
        and type Schema.Path.t = string list
        and type Schema.Hash.t = G.hash
@@ -75,4 +72,9 @@ module type Sigs = sig
   module type G = G
   module type S = S
   module type Backend = Backend
+
+  module G : sig
+    module FS : G with module Info = Irmin.Info.Default
+    module Mem : G with module Info = Irmin.Info.Default
+  end
 end

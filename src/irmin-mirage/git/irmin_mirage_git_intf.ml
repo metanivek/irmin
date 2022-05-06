@@ -32,7 +32,8 @@ module type Maker = sig
       (Schema : Irmin_git.Schema.S
                   with type Hash.t = G.hash
                   with type Node.t = G.Value.Tree.t
-                   and type Commit.t = G.Value.Commit.t) :
+                   and type Commit.t = G.Value.Commit.t
+                   and type Info.t = G.Info.t) :
     S
       with module Git = G
        and type Backend.Remote.endpoint = endpoint
@@ -50,7 +51,7 @@ module type KV_maker = sig
       with module Git = G
        and type Schema.Contents.t = C.t
        and module Schema.Metadata = Irmin_git.Metadata
-       and type Schema.Info.t = Irmin.Info.default
+       and type Schema.Info.t = G.Info.t
        and type Schema.Path.step = string
        and type Schema.Path.t = string list
        and type Schema.Hash.t = G.hash
@@ -136,7 +137,8 @@ module type Sigs = sig
         (Schema : Irmin_git.Schema.S
                     with type Hash.t = G.hash
                      and type Node.t = G.Value.Tree.t
-                     and type Commit.t = G.Value.Commit.t) :
+                     and type Commit.t = G.Value.Commit.t
+                     and type Info.t = G.Info.t) :
       S
         with module Git = G
          and type Backend.Remote.endpoint = endpoint

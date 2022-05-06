@@ -18,5 +18,5 @@ include Xgit_intf.Sigs
 (** @inline *)
 
 module Maker (G : G) : Backend with module G = G
-module FS : Backend with module G = Git_unix.Store
-module Mem : Backend with module G = Irmin_git.Mem
+module FS : Backend with module G = G.FS
+module Mem : Backend with module G = G.Mem

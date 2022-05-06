@@ -54,7 +54,8 @@ module Maker (G : Irmin_git.G) = struct
       (S : Irmin_git.Schema.S
              with type Hash.t = G.hash
               and type Node.t = G.Value.Tree.t
-              and type Commit.t = G.Value.Commit.t) =
+              and type Commit.t = G.Value.Commit.t
+              and type Info.t = G.Info.t) =
   struct
     include Maker.S.Make (S)
 
@@ -80,12 +81,14 @@ module Maker (G : Irmin_git.G) = struct
   end
 end
 
-module FS = struct
-  include Maker (Git_unix.Store)
-  module G = Git_unix.Store
+module G = struct
+  module FS = struct
+    include Git_unix.Store
+    module Info = Irmin.Info.Default
+  end
+
+  module Mem = Irmin_git.Mem
 end
 
-module Mem = struct
-  include Maker (Irmin_git.Mem)
-  module G = Irmin_git.Mem
-end
+module FS = Maker (G.FS)
+module Mem = Maker (G.Mem)

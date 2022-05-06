@@ -78,10 +78,10 @@ module Git : sig
 
   module Maker (G : Irmin_git.G) : Backend with module G = G
 
-  module FS : Backend with module G = Git_unix.Store
+  module FS : Backend with module G = G.FS
   (** Embed an Irmin store into a local Git repository. *)
 
-  module Mem : Backend with module G = Irmin_git.Mem
+  module Mem : Backend with module G = G.Mem
   (** Embed an Irmin store into an in-memory Git repository. *)
 end
 

@@ -16,19 +16,14 @@
 
 open Import
 
-module type G = sig
-  include Git.S
-
-  val v : ?dotgit:Fpath.t -> Fpath.t -> (t, error) result Lwt.t
-end
-
 module Make
-    (G : G)
+    (G : Store.S)
     (S : Git.Sync.S with type hash := G.hash and type store := G.t)
     (Schema : Schema.S
                 with type Hash.t = G.hash
                  and type Node.t = G.Value.Tree.t
-                 and type Commit.t = G.Value.Commit.t) =
+                 and type Commit.t = G.Value.Commit.t
+                 and type Info.t = G.Info.t) =
 struct
   module Hash = Irmin.Hash.Make (G.Hash)
   module Schema = Schema

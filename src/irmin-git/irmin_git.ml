@@ -36,7 +36,8 @@ struct
       (Schema : Schema.S
                   with type Hash.t = G.hash
                    and type Node.t = G.Value.Tree.t
-                   and type Commit.t = G.Value.Commit.t) =
+                   and type Commit.t = G.Value.Commit.t
+                   and type Info.t = G.Info.t) =
   struct
     module B = Backend.Make (G) (S) (Schema)
     include Irmin.Of_backend (B)
@@ -57,6 +58,7 @@ end
 
 module Mem = struct
   include Git.Mem.Store
+  module Info = Irmin.Info.Default
 
   let confs = Hashtbl.create 10
   let find_conf c = Hashtbl.find_opt confs c
@@ -86,7 +88,8 @@ struct
       (Sc : Schema.S
               with type Hash.t = G.hash
                and type Node.t = G.Value.Tree.t
-               and type Commit.t = G.Value.Commit.t) =
+               and type Commit.t = G.Value.Commit.t
+               and type Info.t = G.Info.t) =
     Maker.Make (Sc)
 end
 
@@ -106,6 +109,7 @@ end
 module Content_addressable (G : Git.S) = struct
   module G = struct
     include G
+    module Info = Irmin.Info.Default
 
     let v ?dotgit:_ _root = assert false
   end
@@ -227,10 +231,10 @@ struct
     module Contents = C
     module Path = Irmin.Path.String_list
     module Branch = Branch.Make (Irmin.Branch.String)
-    module Hash = Irmin.Hash.Make (Mem.Hash)
+    module Hash = Irmin.Hash.Make (G.Hash)
     module Node = Node.Make (G) (Path)
     module Commit = Commit.Make (G)
-    module Info = Irmin.Info.Default
+    module Info = G.Info
   end
 
   module Make (C : Irmin.Contents.S) = struct
@@ -239,7 +243,7 @@ struct
     (* We use a dummy store to get the serialisation functions. This is
        probably not necessary and we could use Git.Value.Raw instead. *)
     module Dummy = struct
-      module G = Mem
+      module G = G
       module Maker = Maker (G) (No_sync)
       module S = Maker.Make (Sc)
       include S.Backend

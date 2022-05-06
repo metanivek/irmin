@@ -14,11 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-module type G = sig
-  include Git.S
-
-  val v : ?dotgit:Fpath.t -> Fpath.t -> (t, error) result Lwt.t
-end
+module type G = Store.S
 
 module type S = sig
   (** The Git backend specializes a few types:
@@ -61,7 +57,8 @@ module type Maker = sig
       (Schema : Schema.S
                   with type Hash.t = G.hash
                    and type Node.t = G.Value.Tree.t
-                   and type Commit.t = G.Value.Commit.t) :
+                   and type Commit.t = G.Value.Commit.t
+                   and type Info.t = G.Info.t) :
     S
       with module Git = G
        and module Schema := Schema
@@ -79,7 +76,7 @@ module type KV_maker = sig
       with module Git = G
        and type Schema.Contents.t = C.t
        and type Schema.Metadata.t = Metadata.t
-       and type Schema.Info.t = Irmin.Info.default
+       and type Schema.Info.t = G.Info.t
        and type Schema.Path.step = string
        and type Schema.Path.t = string list
        and type Schema.Hash.t = G.hash
@@ -151,5 +148,8 @@ module type Sigs = sig
 
   (** In-memory Git store. *)
   module Mem :
-    G with type t = Digestif.SHA1.t Git.Mem.t and type hash = Digestif.SHA1.t
+    G
+      with module Info = Irmin.Info.Default
+       and type t = Digestif.SHA1.t Git.Mem.t
+       and type hash = Digestif.SHA1.t
 end

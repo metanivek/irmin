@@ -38,7 +38,8 @@ module Maker (G : Irmin_git.G) = struct
       (S : Irmin_git.Schema.S
              with type Hash.t = G.hash
               and type Node.t = G.Value.Tree.t
-              and type Commit.t = G.Value.Commit.t) =
+              and type Commit.t = G.Value.Commit.t
+              and type Info.t = G.Info.t) =
   struct
     include Maker.Make (S)
 
@@ -81,6 +82,7 @@ module KV_RO (G : Git.S) = struct
 
   module G = struct
     include G
+    module Info = Irmin.Info.Default
 
     let v ?dotgit:_ _root = assert false
   end
