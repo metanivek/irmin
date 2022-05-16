@@ -1,0 +1,5 @@
+(library
+ (name irmin_top)
+ (public_name irmin.top)
+ (libraries compiler-libs.toplevel)
+ (modes byte))
