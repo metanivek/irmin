@@ -1033,7 +1033,8 @@ module type S_generic_key = sig
     tree ->
     kinded_key Lwt.t
   (** Save a tree into the database. Does not do any reads. If [clear] is set
-      (it is by default), the tree cache will be cleared after the save. *)
+      (it is by default), the tree cache will be cleared
+      after the save. *)
 
   (** {Deprecated} *)
 
