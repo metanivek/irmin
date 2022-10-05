@@ -111,7 +111,7 @@ module Store = struct
   (** Predefined commits. *)
   let commit_1 t =
     let* t = set t [ "a"; "b" ] "Novembre" in
-    let* t = set t [ "a"; "c" ] "Juin" in
+    (* let* t = set t [ "a"; "c" ] "Juin" in *)
     let+ h = commit t in
     (t, h)
 
@@ -143,7 +143,7 @@ module Store = struct
   let commit_1_different_author t =
     let info = S.Info.v ~author:"someone" Int64.zero in
     let* t = set t [ "a"; "b" ] "Novembre" in
-    let* t = set t [ "a"; "c" ] "Juin" in
+    (* let* t = set t [ "a"; "c" ] "Juin" in *)
     let+ h = commit ~info t in
     (t, h)
 end
@@ -152,6 +152,7 @@ include Store
 
 (** Wrappers for testing. *)
 let check_blob tree key expected =
+  Fmt.pf Fmt.stdout "check_blob %a\n" Irmin.Type.(pp S.Path.t) key;
   let+ got = S.Tree.find tree key in
   Alcotest.(check (option string)) "find blob" (Some expected) got
 
@@ -160,13 +161,16 @@ let check_none tree key =
   Alcotest.(check (option string)) "blob not found" None got
 
 let check_tree_1 tree =
+  Fmt.pf Fmt.stdout "check_tree_1\n";
   let* () = check_blob tree [ "a"; "b" ] "Novembre" in
-  check_blob tree [ "a"; "c" ] "Juin"
+  Lwt.return_unit
+  (* check_blob tree [ "a"; "c" ] "Juin" *)
 
 let check_1 t c =
   S.Commit.of_key t.repo (S.Commit.key c) >>= function
   | None -> Alcotest.fail "no hash found in repo for check_1"
   | Some commit ->
+      Fmt.pf Fmt.stdout "check_1 %a\n" S.Commit.pp_hash c;
       let tree = S.Commit.tree commit in
       check_tree_1 tree
 
@@ -558,10 +562,13 @@ module Gc = struct
   let gc_similar_commits () =
     let* t = init () in
     let* t, c1 = commit_1 t in
+    Fmt.pf Fmt.stdout "COMIT c1: %a\n\n" S.Commit.pp_hash c1;
     let* () = start_gc t c1 in
     let* () = finalise_gc t in
+    let* () = check_1 t c1 in
     let* t = checkout_exn t c1 in
     let* t, c1_again = commit_1_different_author t in
+    Fmt.pf Fmt.stdout "COMMIT c1_again: %a\n\n" S.Commit.pp_hash c1_again;
     let* () = start_gc t c1_again in
     let* () = finalise_gc t in
     let* () = check_1 t c1_again in

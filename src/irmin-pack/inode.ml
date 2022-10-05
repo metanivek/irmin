@@ -1850,6 +1850,7 @@ struct
         key_of_hash:(hash -> key) ->
         t Irmin.Type.decode_bin =
      fun ~dict ~key_of_offset ~key_of_hash t pos_ref ->
+      [%log.debug "[pack] decode inode"];
       Stats.incr_inode_decode_bin ();
       let i = decode_compress t pos_ref in
       let step : Compress.name -> T.step = function

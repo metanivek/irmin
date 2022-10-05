@@ -131,6 +131,7 @@ struct
     encode_value { kind; hash; v } f
 
   let decode_bin ~dict:_ ~key_of_offset:_ ~key_of_hash:_ s off =
+    [%log.debug "[pack] decode contents"];
     let t = decode_value s off in
     t.v
 
@@ -215,6 +216,7 @@ struct
     Entry.V1.encode_bin { hash; kind = Commit_v2; v = { length; v } } f
 
   let decode_bin ~dict:_ ~key_of_offset ~key_of_hash s off =
+    [%log.debug "[pack] decode commit"];
     let key_of_address : Commit_direct.address -> Key.t = function
       | Offset x -> key_of_offset x
       | Hash x -> key_of_hash x

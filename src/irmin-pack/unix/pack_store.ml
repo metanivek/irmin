@@ -285,6 +285,7 @@ struct
         Pack_key.v_indexed entry_prefix.hash
 
   let find_in_pack_file t key =
+    [%log.debug "[pack] find_in_pack_file %a" pp_key key];
     match accessor_of_key t key with
     | exception Dangling_hash -> None
     | exception Errors.Pack_error `Read_out_of_bounds -> (
@@ -310,9 +311,13 @@ struct
     | accessor ->
         let buf = Bytes.create (len_of_direct_key key) in
         Dispatcher.read_exn t.dispatcher accessor buf;
-        if gced buf then None
+          [%log.debug "[pack] find_in_pack_file w/ accessor!"];
+        if gced buf then
+          let () = [%log.debug "[pack] gced!"] in
+          None
         else
           let key_of_offset = key_of_offset t in
+          [%log.debug "[pack] NOT gced!"];
           let key_of_hash = Pack_key.v_indexed in
           let dict = Dict.find t.dict in
           let v =
