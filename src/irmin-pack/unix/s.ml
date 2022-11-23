@@ -40,6 +40,9 @@ module type S = sig
   (** [flush t] flush read-write pack on disk. Raises [RO_Not_Allowed] if called
       by a readonly instance.*)
 
+  val split : repo -> unit
+  (** [split t] fakes a chunk split. *)
+
   module Gc : sig
     (** GC *)
 

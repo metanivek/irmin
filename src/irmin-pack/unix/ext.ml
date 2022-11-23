@@ -502,6 +502,7 @@ module Maker (Config : Conf.S) = struct
     let reload = X.Repo.reload
     let flush = X.Repo.flush
     let fsync = X.Repo.fsync
+    let split _ = ()
 
     module Gc = struct
       type msg = [ `Msg of string ]
