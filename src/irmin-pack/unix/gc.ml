@@ -59,6 +59,7 @@ module Main_stats : sig
 
   val create :
     string ->
+    generation:int ->
     commit_offset:int63 ->
     before_suffix_start_offset:int63 ->
     before_suffix_end_offset:int63 ->
@@ -78,8 +79,9 @@ end = struct
   type t = { stats : S.stats; timer : Steps_timer.t }
   (** [t] is the running state while computing the stats *)
 
-  let create first_stepname ~commit_offset ~before_suffix_start_offset
-      ~before_suffix_end_offset ~after_suffix_start_offset =
+  let create first_stepname ~generation ~commit_offset
+      ~before_suffix_start_offset ~before_suffix_end_offset
+      ~after_suffix_start_offset =
     let stats = Irmin.Type.(random S.stats_t |> unstage) () in
     (* [repr] provides doesn't provide a generator that fills a type with
        zeroes but it provides a random generator. Let's use it for our initial
@@ -88,6 +90,7 @@ end = struct
       S.
         {
           stats with
+          generation;
           steps = [];
           commit_offset;
           before_suffix_start_offset;
@@ -513,7 +516,8 @@ module Worker = struct
            because, when decoding the [Commit_value.t] at [commit_key], the
            parents will have to be read in order to produce a key for them. *)
         stats :=
-          Worker_stats.finish_current_step !stats "mapping: commits to sorted";
+          Worker_stats.finish_current_step !stats
+            "mapping: commits to reachable";
         let register_object_exn key =
           match Pack_key.inspect key with
           | Indexed _ ->
@@ -527,7 +531,8 @@ module Worker = struct
 
         (* Step 3.3 Put the nodes and contents in the reachable file. *)
         stats :=
-          Worker_stats.finish_current_step !stats "mapping: objects to sorted";
+          Worker_stats.finish_current_step !stats
+            "mapping: objects to reachable";
         let register_object_exn key =
           match Pack_key.inspect key with
           | Indexed _ ->
@@ -545,7 +550,7 @@ module Worker = struct
 
         (* Step 3.4 Return and let the [Mapping_file] routine create the mapping
            file. *)
-        stats := Worker_stats.finish_current_step !stats "mapping: of sorted";
+        stats := Worker_stats.finish_current_step !stats "mapping: of reachable";
         ()
       in
 
@@ -715,7 +720,7 @@ module Make (Args : Args) = struct
         (* This will not just be [offset] anymore when the commit is moved the
            the prefix file. *)
       in
-      Main_stats.create "worker startup" ~commit_offset
+      Main_stats.create "worker startup" ~commit_offset ~generation
         ~before_suffix_start_offset ~before_suffix_end_offset
         ~after_suffix_start_offset
     in
@@ -931,21 +936,22 @@ module Make (Args : Args) = struct
                 in
                 if t.unlink then unlink_all t;
 
-                let partial_stats =
+                let stats =
                   let after_suffix_end_offset =
                     Dispatcher.end_offset t.dispatcher
                   in
                   Main_stats.finalise partial_stats worker_stats
                     ~after_suffix_end_offset
                 in
-                t.resulting_stats <- Some partial_stats;
+                Stats.report_latest_gc stats;
+                t.resulting_stats <- Some stats;
 
                 [%log.debug
                   "Gc ended successfully. %a"
                     (Irmin.Type.pp Stats.Latest_gc.stats_t)
-                    partial_stats];
-                let () = Lwt.wakeup_later t.resolver (Ok partial_stats) in
-                Ok (`Finalised partial_stats)
+                    stats];
+                let () = Lwt.wakeup_later t.resolver (Ok stats) in
+                Ok (`Finalised stats)
             | _ ->
                 clean_after_abort t;
                 let err = gc_errors status gc_output in
