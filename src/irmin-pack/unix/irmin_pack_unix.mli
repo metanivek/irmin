@@ -16,10 +16,8 @@
 
 (** {1 Store} *)
 
-module type S = Store_intf.S
-
-module Maker (Config : Irmin_pack.Conf.S) : Store_intf.Maker_persistent
-module KV (Config : Irmin_pack.Conf.S) : Store_intf.KV
+include Store_intf.Sigs
+(** @inline *)
 
 (** {1 Key and Values} *)
 

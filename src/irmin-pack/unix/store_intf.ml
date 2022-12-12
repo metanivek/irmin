@@ -332,6 +332,9 @@ module type KV = sig
        and type Schema.Branch.t = string
 end
 
-(* This *_intf module does not have a Sigs module type as it is
-   directly exposed in the top-level interface
-   (irmin_pack_Unix.mli). *)
+module type Sigs = sig
+  module type S = S
+
+  module Maker (Config : Irmin_pack.Conf.S) : Maker_persistent
+  module KV (Config : Irmin_pack.Conf.S) : KV
+end
