@@ -16,8 +16,10 @@
 
 (** {1 Store} *)
 
-include Store_intf.Sigs
-(** @inline *)
+module type S = Store.S
+
+module Maker (Config : Irmin_pack.Conf.S) : Store.Maker
+module KV (Config : Irmin_pack.Conf.S) : Store.KV
 
 (** {1 Key and Values} *)
 

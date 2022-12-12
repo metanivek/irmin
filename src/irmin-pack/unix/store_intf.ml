@@ -303,12 +303,9 @@ module type Maker = sig
        and type commit_key = Schema.Hash.t commit_key
        and type Backend.Remote.endpoint = endpoint
 end
-
-module type Maker_persistent =
-  Maker
-    with type ('h, _) contents_key = 'h Pack_key.t
-     and type 'h node_key = 'h Pack_key.t
-     and type 'h commit_key = 'h Pack_key.t
+with type ('h, _) contents_key = 'h Pack_key.t
+ and type 'h node_key = 'h Pack_key.t
+ and type 'h commit_key = 'h Pack_key.t
 
 module type KV = sig
   type endpoint = unit
@@ -334,7 +331,6 @@ end
 
 module type Sigs = sig
   module type S = S
-
-  module Maker (Config : Irmin_pack.Conf.S) : Maker_persistent
-  module KV (Config : Irmin_pack.Conf.S) : KV
+  module type Maker = Maker
+  module type KV = KV
 end

@@ -16,6 +16,8 @@
 
 open! Import
 
+include Store_intf
+
 module Maker (Config : Conf.S) = struct
   type endpoint = unit
 
