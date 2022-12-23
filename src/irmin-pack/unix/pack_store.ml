@@ -276,7 +276,23 @@ struct
            header during [find]. *)
         Pack_key.v_indexed entry_prefix.hash
 
+  let hash_tbl = Hashtbl.create 127
+  let counter = ref 0
+  let stats () = Fmt.str "Reads in pack %d\n" !counter
+
   let find_in_pack_file ~key_of_offset t key =
+    let () =
+      incr counter;
+      let hash =
+        match Pack_key.inspect key with
+        | Indexed hash -> hash
+        | Direct { hash; _ } -> hash
+      in
+      match Hashtbl.find_opt hash_tbl hash with
+      | None -> Hashtbl.add hash_tbl hash ()
+      | Some _ -> Fmt.failwith "Hash computed twice %a\n%!" pp_hash hash
+    in
+
     match accessor_of_key t key with
     | exception Dangling_hash -> None
     | exception Errors.Pack_error `Read_out_of_bounds -> (

@@ -434,6 +434,9 @@ struct
     Utils.Object_counter.finalise counter;
     result
 
+  let c_blob = ref 0
+  let c_nodes = ref 0
+
   let check_minimal ?ppf ~pred ~iter ~check ~recompute_hash t =
     let ppf = set_ppf ppf in
     Fmt.pf ppf "Running the integrity_check.\n%!";
@@ -451,6 +454,9 @@ struct
       in
       errors := msg :: !errors
     in
+
+    (* Commits are checked for integrity by the [find] in the [pred] functions.
+       We need to check the contents and the inodes. *)
     let check_contents key =
       match Pack_key.inspect key with
       | Indexed _hash ->
@@ -469,9 +475,8 @@ struct
               add_error err hash;
               Lwt.return_unit)
     in
-    (* Non-stable inodes and commits are checked for integrity by the [find] in the
-       [pred] functions. We need to check the contents and the stable nodes. *)
     let contents key =
+      incr c_blob;
       progress_contents ();
       check_contents key
     in
@@ -505,6 +510,7 @@ struct
           if not (equal_hash h h') then add_error `Wrong_hash h
     in
     let node key =
+      incr c_nodes;
       progress_nodes ();
       check_nodes key
     in
@@ -521,9 +527,9 @@ struct
         add_error `Wrong_hash (XKey.to_hash k);
         Lwt.return []
     in
-
     let+ () = iter ~contents ~node ~pred_node ~pred_commit t in
     Utils.Object_counter.finalise counter;
+    Fmt.epr "counters blob %d nodes %d\n%!" !c_blob !c_nodes;
     if !errors = [] then Ok `No_error
     else
       Fmt.kstr
