@@ -64,6 +64,8 @@ struct
     fm : Fm.t;
     dict : Dict.t;
     dispatcher : Dispatcher.t;
+    hash_tbl : int Tbl.t;
+    mutable counter : int;
   }
 
   type hash = Hash.t [@@deriving irmin ~pp ~equal ~decode_bin]
@@ -116,7 +118,17 @@ struct
     in
     let lru = Lru.create ~weight lru_size in
     Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging);
-    { lru; staging; indexing_strategy; fm; dict; dispatcher }
+    let hash_tbl = Tbl.create 127 in
+    {
+      lru;
+      staging;
+      indexing_strategy;
+      fm;
+      dict;
+      dispatcher;
+      hash_tbl;
+      counter = 0;
+    }
 
   module Entry_prefix = struct
     type t = {
@@ -276,21 +288,23 @@ struct
            header during [find]. *)
         Pack_key.v_indexed entry_prefix.hash
 
-  let hash_tbl = Hashtbl.create 127
-  let counter = ref 0
-  let stats () = Fmt.str "Reads in pack %d\n" !counter
+  let stats t =
+    Fmt.epr "hash_tbl - len = %d\n%!" (Tbl.length t.hash_tbl);
+    (* Tbl.iter (fun h c -> Fmt.epr "(%a, %d) " pp_hash h c) t.hash_tbl; *)
+    Fmt.epr "Reads in pack %d\n%!" t.counter;
+    ""
 
   let find_in_pack_file ~key_of_offset t key =
     let () =
-      incr counter;
+      t.counter <- t.counter + 1;
       let hash =
         match Pack_key.inspect key with
         | Indexed hash -> hash
         | Direct { hash; _ } -> hash
       in
-      match Hashtbl.find_opt hash_tbl hash with
-      | None -> Hashtbl.add hash_tbl hash ()
-      | Some _ -> Fmt.failwith "Hash computed twice %a\n%!" pp_hash hash
+      match Tbl.find_opt t.hash_tbl hash with
+      | None -> Tbl.replace t.hash_tbl hash 1
+      | Some v -> Tbl.replace t.hash_tbl hash (v + 1)
     in
 
     match accessor_of_key t key with
@@ -533,4 +547,6 @@ struct
 
   let unsafe_find_no_prefetch t key =
     Inner.unsafe_find_no_prefetch (get_if_open_exn t) key
+
+  let stats t = Inner.stats (get_if_open_exn t)
 end

@@ -74,6 +74,8 @@ module type S = sig
       only contain their [offset] and are not usable without calling
       [key_of_offset] first. This function only exists to optimize the GC
       reachability traversal. *)
+
+  val stats : 'a t -> string
 end
 
 module type Sigs = sig

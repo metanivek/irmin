@@ -1235,45 +1235,16 @@ struct
       in
       { v_ref = Val_ref.of_hash t.Bin.hash; root = t.Bin.root; v }
 
-    let len_tbl = Hashtbl.create 127
-    let hash_tbl = Hashtbl.create 127
-    let counter_stable = ref 0
-    let counter = ref 0
-
     let recompute_hash layout t =
-      let hash =
-        if is_stable t then (
-          incr counter_stable;
-          let vs = seq layout ~cache:false t in
-          Node.hash (Node.of_seq vs))
-        else (
-          incr counter;
-          let v = to_bin_v layout Bin.Ptr_any t.v in
-          Bin.V.hash v)
-      in
       let len = length_of_v t.v in
-      let () =
-        match Hashtbl.find_opt len_tbl len with
-        | None -> Hashtbl.add len_tbl len 1
-        | Some l -> Hashtbl.add len_tbl len (l + 1)
-      in
-      let () =
-        match Hashtbl.find_opt hash_tbl hash with
-        | None -> Hashtbl.add hash_tbl hash ()
-        | Some _ -> Fmt.failwith "Hash computed twice %a\n%!" pp_hash hash
-      in
-      hash
-
-    let stats () =
-      let str =
-        Hashtbl.fold
-          (fun l c str -> str ^ Fmt.str "(%d, %d); " l c)
-          len_tbl "len_tbl -"
-      in
-      str
-      ^ "\n"
-      ^ Fmt.str "counter %d\n" !counter
-      ^ Fmt.str "counter_stable %d\n" !counter_stable
+      if is_stable t then
+        let vs = seq layout ~cache:false t in
+        let hash = Node.hash (Node.of_seq vs) in
+        (hash, len, true)
+      else
+        let v = to_bin_v layout Bin.Ptr_any t.v in
+        let hash = Bin.V.hash v in
+        (hash, len, false)
 
     let empty : 'a. 'a layout -> 'a t =
      fun _ ->

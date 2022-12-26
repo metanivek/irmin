@@ -490,7 +490,16 @@ module Maker (Config : Conf.S) = struct
       let check ~offset ~length k =
         X.Contents.CA.integrity_check ~offset ~length k contents
       in
-      Integrity_checks.check_minimal ?ppf ~pred ~iter ~check ~recompute_hash t
+      let res =
+        Integrity_checks.check_minimal ?ppf ~pred ~iter ~check ~recompute_hash t
+      in
+      Fmt.epr "commit stats =\n%!";
+      let _stats = X.Commit.CA.stats (snd (X.Repo.commit_t t)) in
+      Fmt.epr "node stats =\n%!";
+      let _stats = X.Node.CA.Pack.stats (snd (X.Repo.node_t t)) in
+      Fmt.epr "blob stats =\n%!";
+      let _stats = X.Contents.CA.stats contents in
+      res
 
     let integrity_check ?ppf ?heads ~auto_repair t =
       let is_minimal =

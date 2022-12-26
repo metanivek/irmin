@@ -375,6 +375,16 @@ module Integrity_checks
             and type Schema.Hash.t = XKey.hash)
     (Index : Pack_index.S) =
 struct
+  module Table (K : Irmin.Hash.S) = Hashtbl.Make (struct
+    type t = K.t
+
+    let hash = K.short_hash
+    let equal = Irmin.Type.(unstage (equal K.t))
+  end)
+
+  module Tbl = Table (X.Hash)
+  module IntTbl = Hashtbl
+
   let null =
     match Sys.os_type with
     | "Unix" | "Cygwin" -> "/dev/null"
@@ -434,10 +444,16 @@ struct
     Utils.Object_counter.finalise counter;
     result
 
-  let c_blob = ref 0
-  let c_nodes = ref 0
-
   let check_minimal ?ppf ~pred ~iter ~check ~recompute_hash t =
+    let hash_tbl = Tbl.create 127 in
+    let len_tbl = IntTbl.create 127 in
+
+    (* let steps = IntTbl.create 127 in *)
+    let c_blob = ref 0 in
+    let c_nodes = ref 0 in
+    let c_stable = ref 0 in
+    let c_non_stable = ref 0 in
+
     let ppf = set_ppf ppf in
     Fmt.pf ppf "Running the integrity_check.\n%!";
     let errors = ref [] in
@@ -480,7 +496,7 @@ struct
       progress_contents ();
       check_contents key
     in
-    let pred_node repo key =
+    let get_pred_len repo key =
       try
         X.Node.find (X.Repo.node_t repo) key >|= function
         | None ->
@@ -488,13 +504,33 @@ struct
               (XKey.to_hash key)
         | Some v ->
             let preds = pred v in
-            List.rev_map
+            List.length preds
+      with _exn -> Fmt.failwith "Wrong_hash"
+    in
+    let cn = ref 0 in
+    let pred_node repo key =
+      try
+        X.Node.find (X.Repo.node_t repo) key >>= function
+        | None ->
+            Fmt.failwith "node with hash %a not found" pp_hash
+              (XKey.to_hash key)
+        | Some v ->
+            let preds = pred v in
+            Lwt_list.map_s
               (function
                 | s, `Inode x ->
                     assert (s = None);
-                    `Node x
-                | _, `Node x -> `Node x
-                | _, `Contents x -> `Contents x)
+                    Lwt.return (`Node x)
+                | _step, `Node x ->
+                    (* Hashtbl.add steps step (XKey.to_hash key); *)
+                    let* pr = get_pred_len repo x in
+                    (* let st = Option.get step in *)
+                    if pr > 32 && pr <= 256 then incr cn;
+                    (* Fmt.epr "XXX %a %d %a" *)
+                    (* (Irmin.Type.pp X.Node.Path.step_t) *)
+                    (* st pr pp_hash (XKey.to_hash key); *)
+                    Lwt.return (`Node x)
+                | _, `Contents x -> Lwt.return (`Contents x))
               preds
       with _exn ->
         add_error `Wrong_hash (XKey.to_hash key);
@@ -506,9 +542,23 @@ struct
           Fmt.failwith "node with hash %a not found" pp_hash (XKey.to_hash key)
       | Some v ->
           let h = XKey.to_hash key in
-          let h' = recompute_hash v in
-          if not (equal_hash h h') then add_error `Wrong_hash h
+          let h', len, stable = recompute_hash v in
+          if not (equal_hash h h') then add_error `Wrong_hash h;
+          let () = if stable then incr c_stable else incr c_non_stable in
+          (* Fmt.epr "XXX len %d hash %a\n%!" len pp_hash h; *)
+          let () =
+            match IntTbl.find_opt len_tbl len with
+            | None -> IntTbl.replace len_tbl len 1
+            | Some l -> IntTbl.replace len_tbl len (l + 1)
+          in
+          let () =
+            match Tbl.find_opt hash_tbl h with
+            | None -> Tbl.replace hash_tbl h 1
+            | Some v -> Tbl.replace hash_tbl h (v + 1)
+          in
+          ()
     in
+
     let node key =
       incr c_nodes;
       progress_nodes ();
@@ -529,7 +579,26 @@ struct
     in
     let+ () = iter ~contents ~node ~pred_node ~pred_commit t in
     Utils.Object_counter.finalise counter;
-    Fmt.epr "counters blob %d nodes %d\n%!" !c_blob !c_nodes;
+
+    Fmt.epr "counters blob %d; nodes %d\n%!" !c_blob !c_nodes;
+    Fmt.epr "counters stable %d; non stable %d counters nodes_btw %d\n%!"
+      !c_stable !c_non_stable !cn;
+    Fmt.epr "hash_tbl - len = %d\n%!" (Tbl.length hash_tbl);
+    (* Tbl.iter (fun h c -> Fmt.epr "(%a, %d) " pp_hash h c) hash_tbl; *)
+    (* Tbl.iter (fun _ c -> if c != 1 then Fmt.epr "%d; " c) hash_tbl; *)
+    Fmt.epr "\n%!";
+    (* Fmt.epr "len_tbl - len = %d\n%!" (IntTbl.length len_tbl); *)
+    let gt_256 = ref 0 in
+    let btw = ref 0 in
+    let lt_32 = ref 0 in
+    IntTbl.iter
+      (fun l c ->
+        if l <= 32 then lt_32 := !lt_32 + c
+        else if l > 256 then gt_256 := !gt_256 + c
+        else btw := !btw + c)
+      len_tbl;
+    Fmt.epr "lengths: %d - %d - %d \n%!" !lt_32 !btw !gt_256;
+    (* Fmt.epr "\n%!"; *)
     if !errors = [] then Ok `No_error
     else
       Fmt.kstr
