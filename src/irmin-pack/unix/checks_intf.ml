@@ -172,7 +172,7 @@ module type Sigs = sig
         length:int ->
         XKey.hash ->
         (unit, [< `Absent_value | `Wrong_hash ]) result) ->
-      recompute_hash:(X.Node.value -> XKey.hash * int * bool) ->
+      recompute_hash:(X.Node.value -> XKey.hash * int * bool * bool) ->
       X.Repo.t ->
       ([> `No_error ], [> `Cannot_fix of string ]) result Lwt.t
 

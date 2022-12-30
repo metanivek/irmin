@@ -1236,15 +1236,16 @@ struct
       { v_ref = Val_ref.of_hash t.Bin.hash; root = t.Bin.root; v }
 
     let recompute_hash layout t =
+      let is_root = is_root t in
       let len = length_of_v t.v in
       if is_stable t then
         let vs = seq layout ~cache:false t in
         let hash = Node.hash (Node.of_seq vs) in
-        (hash, len, true)
+        (hash, len, true, is_root)
       else
         let v = to_bin_v layout Bin.Ptr_any t.v in
         let hash = Bin.V.hash v in
-        (hash, len, false)
+        (hash, len, false, is_root)
 
     let empty : 'a. 'a layout -> 'a t =
      fun _ ->

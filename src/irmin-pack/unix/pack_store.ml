@@ -289,7 +289,7 @@ struct
         Pack_key.v_indexed entry_prefix.hash
 
   let stats t =
-    Fmt.epr "hash_tbl - len = %d\n%!" (Tbl.length t.hash_tbl);
+    Fmt.epr "hash_tbl length = %d\n%!" (Tbl.length t.hash_tbl);
     (* Tbl.iter (fun h c -> Fmt.epr "(%a, %d) " pp_hash h c) t.hash_tbl; *)
     Fmt.epr "Reads in pack %d\n%!" t.counter;
     ""

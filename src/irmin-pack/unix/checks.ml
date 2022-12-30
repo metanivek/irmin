@@ -173,8 +173,8 @@ module Make (Store : Store) = struct
         if always then Irmin_pack.Indexing_strategy.always
         else Irmin_pack.Indexing_strategy.minimal
       in
-      Conf.init ~readonly:false ~fresh:false ~no_migrate:true ~indexing_strategy
-        root
+      Conf.init ~lru_size:1_000_000 ~readonly:false ~fresh:false
+        ~no_migrate:true ~indexing_strategy root
 
     let handle_result ?name res =
       let name = match name with Some x -> x ^ ": " | None -> "" in
@@ -502,12 +502,48 @@ struct
         | None ->
             Fmt.failwith "node with hash %a not found" pp_hash
               (XKey.to_hash key)
-        | Some v ->
-            let preds = pred v in
-            List.length preds
+        | Some v -> X.Node.Val.length v
+        (* let preds = pred v in *)
+        (* List.length preds *)
       with _exn -> Fmt.failwith "Wrong_hash"
     in
-    let cn = ref 0 in
+
+    let cn_0_to_32 = ref 0 in
+    let cn_32_to_256 = ref 0 in
+    let cn_256_to_inf = ref 0 in
+
+    let cnode_pred = ref 0 in
+    let cinode_pred = ref 0 in
+
+    let cnon_root = ref 0 in
+
+    let module StringSet = Set.Make (String) in
+    let step_set = ref StringSet.empty in
+
+    let count_pred_node repo step n =
+      incr cnode_pred;
+      let+ pr = get_pred_len repo n in
+      let print_step l =
+        match step with
+        | None -> ()
+        | Some s ->
+            let step_str = Irmin.Type.(to_string X.Node.Path.step_t s) in
+            if StringSet.mem step_str !step_set then ()
+            else (
+              step_set := StringSet.add step_str !step_set;
+              Fmt.epr "%s - %d\n%!" step_str l)
+      in
+      match pr with
+      | x when 0 <= x && x <= 32 -> incr cn_0_to_32
+      (* print_step x *)
+      | x when 32 < x && x <= 256 ->
+          incr cn_32_to_256;
+          print_step x
+      | x ->
+          incr cn_256_to_inf;
+          print_step x
+    in
+
     let pred_node repo key =
       try
         X.Node.find (X.Repo.node_t repo) key >>= function
@@ -518,17 +554,11 @@ struct
             let preds = pred v in
             Lwt_list.map_s
               (function
-                | s, `Inode x ->
-                    assert (s = None);
+                | _step, `Inode x ->
+                    incr cinode_pred;
                     Lwt.return (`Node x)
-                | _step, `Node x ->
-                    (* Hashtbl.add steps step (XKey.to_hash key); *)
-                    let* pr = get_pred_len repo x in
-                    (* let st = Option.get step in *)
-                    if pr > 32 && pr <= 256 then incr cn;
-                    (* Fmt.epr "XXX %a %d %a" *)
-                    (* (Irmin.Type.pp X.Node.Path.step_t) *)
-                    (* st pr pp_hash (XKey.to_hash key); *)
+                | step, `Node x ->
+                    let* _ = count_pred_node repo step x in
                     Lwt.return (`Node x)
                 | _, `Contents x -> Lwt.return (`Contents x))
               preds
@@ -542,14 +572,16 @@ struct
           Fmt.failwith "node with hash %a not found" pp_hash (XKey.to_hash key)
       | Some v ->
           let h = XKey.to_hash key in
-          let h', len, stable = recompute_hash v in
+          let h', len, stable, is_root = recompute_hash v in
           if not (equal_hash h h') then add_error `Wrong_hash h;
           let () = if stable then incr c_stable else incr c_non_stable in
           (* Fmt.epr "XXX len %d hash %a\n%!" len pp_hash h; *)
           let () =
-            match IntTbl.find_opt len_tbl len with
-            | None -> IntTbl.replace len_tbl len 1
-            | Some l -> IntTbl.replace len_tbl len (l + 1)
+            if is_root then
+              match IntTbl.find_opt len_tbl len with
+              | None -> IntTbl.replace len_tbl len 1
+              | Some l -> IntTbl.replace len_tbl len (l + 1)
+            else incr cnon_root
           in
           let () =
             match Tbl.find_opt hash_tbl h with
@@ -568,11 +600,13 @@ struct
     let pred_commit repo k =
       try
         progress_commits ();
-        X.Commit.find (X.Repo.commit_t repo) k >|= function
-        | None -> []
+        let* c = X.Commit.find (X.Repo.commit_t repo) k in
+        match c with
+        | None -> Lwt.return []
         | Some c ->
             let node = X.Commit.Val.node c in
-            [ `Node node ]
+            let* _ = count_pred_node repo None node in
+            Lwt.return [ `Node node ]
       with _exn ->
         add_error `Wrong_hash (XKey.to_hash k);
         Lwt.return []
@@ -581,12 +615,19 @@ struct
     Utils.Object_counter.finalise counter;
 
     Fmt.epr "counters blob %d; nodes %d\n%!" !c_blob !c_nodes;
-    Fmt.epr "counters stable %d; non stable %d counters nodes_btw %d\n%!"
-      !c_stable !c_non_stable !cn;
-    Fmt.epr "hash_tbl - len = %d\n%!" (Tbl.length hash_tbl);
+    (* Fmt.epr "counters stable %d; non stable %d counters nodes_btw %d\n%!" *)
+    (*   !c_stable !c_non_stable !cn; *)
+    Fmt.epr "nodes (inode, node pred): %d + %d = %d\n%!" !cinode_pred
+      !cnode_pred
+      (!cinode_pred + !cnode_pred);
+    Fmt.epr "nodes (0-32, 32-256, 256+ pred): %d + %d + %d = %d\n%!" !cn_0_to_32
+      !cn_32_to_256 !cn_256_to_inf
+      (!cn_0_to_32 + !cn_32_to_256 + !cn_256_to_inf);
+
+    (* Fmt.epr "hash_tbl - len = %d\n%!" (Tbl.length hash_tbl); *)
     (* Tbl.iter (fun h c -> Fmt.epr "(%a, %d) " pp_hash h c) hash_tbl; *)
     (* Tbl.iter (fun _ c -> if c != 1 then Fmt.epr "%d; " c) hash_tbl; *)
-    Fmt.epr "\n%!";
+    (* Fmt.epr "\n%!"; *)
     (* Fmt.epr "len_tbl - len = %d\n%!" (IntTbl.length len_tbl); *)
     let gt_256 = ref 0 in
     let btw = ref 0 in
@@ -597,7 +638,14 @@ struct
         else if l > 256 then gt_256 := !gt_256 + c
         else btw := !btw + c)
       len_tbl;
-    Fmt.epr "lengths: %d - %d - %d \n%!" !lt_32 !btw !gt_256;
+    let c_root = !lt_32 + !btw + !gt_256 in
+    Fmt.epr "nodes (non, root check) %d + %d = %d\n%!" !cnon_root c_root
+      (!cnon_root + c_root);
+    Fmt.epr "nodes (non, stable check): %d + %d = %d\n%!" !c_non_stable
+      !c_stable
+      (!c_non_stable + !c_stable);
+    Fmt.epr "nodes (0-32, 32-256, 256+ check): %d + %d + %d = %d\n%!" !lt_32
+      !btw !gt_256 c_root;
     (* Fmt.epr "\n%!"; *)
     if !errors = [] then Ok `No_error
     else

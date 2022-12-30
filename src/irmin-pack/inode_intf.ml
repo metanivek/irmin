@@ -65,7 +65,7 @@ module type Value = sig
 
   val nb_children : t -> int
 
-  val recompute_hash : t -> hash * int * bool
+  val recompute_hash : t -> hash * int * bool * bool
   (** Recompute hash for inodes, used in eager integrity checks.*)
 end
 
