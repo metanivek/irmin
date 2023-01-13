@@ -8,6 +8,11 @@
  (modules generate)
  (libraries irmin-tezos irmin-pack irmin-pack.unix))
 
+(executable
+ (name list)
+ (modules list)
+ (libraries irmin-tezos irmin-pack.unix hex))
+
 (rule
  (alias generate-cli-test-data)
  (targets data)

@@ -472,7 +472,7 @@ module Make (Io : Io.S) = struct
 
   let iter_exn { arr; _ } f =
     for i = 0 to entry_count arr - 1 do
-      f ~off:(entry_off arr i) ~len:(entry_len arr i)
+      f ~off:(entry_off arr i) ~len:(entry_len arr i) ~poff:(entry_poff arr i)
     done
 
   let iter t f =

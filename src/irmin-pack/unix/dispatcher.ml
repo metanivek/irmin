@@ -118,6 +118,21 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
       let open Int63 in
       let open Int63.Syntax in
       let res = Mapping_file.find_nearest_leq mapping off_start in
+
+      (* let open struct *)
+      (*   type entry = (int63 * int63 * int) list [@@deriving irmin ~pp] *)
+      (* end in *)
+      (* let entries = ref [] in *)
+      (* let _ = *)
+      (*   Mapping_file.iter mapping (fun ~off ~len ~poff -> *)
+      (*       entries := (off, poff, len) :: !entries *)
+      (*       (\* Fmt.pr "%a -> %a (%d)" Int63.pp off Int63.pp poff len *\)) *)
+      (* in *)
+      (* let oc = Out_channel.open_text "mapping.json" in *)
+      (* let formatter = Format.formatter_of_out_channel oc in *)
+      (* Fmt.pf formatter "%a" Irmin.Type.(pp_json entry_t) !entries; *)
+      (* Out_channel.close oc; *)
+
       match res with
       | None ->
           (* Case 1: The entry if before the very first chunk (or there are no
@@ -141,7 +156,7 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
              Fmt.str
                "offset %a is supposed to be contained in chunk \
                 (off=%a,poff=%a,len=%d) but starts after chunk"
-               Int63.pp off_start Int63.pp chunk_off_start Int63.pp entry.poff
+               Int63.pp off_start Int63.pp entry.off Int63.pp entry.poff
                entry.len
            in
            raise (Errors.Pack_error (`Invalid_read_of_gced_object s)));
@@ -334,7 +349,8 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
       match Fm.mapping t.fm with
       | Some mapping ->
           let preffix_chunks = ref [] in
-          Mapping_file.iter mapping (fun ~off ~len ->
+          Mapping_file.iter mapping (fun ~off ~len ~poff ->
+              ignore poff;
               preffix_chunks := (off, len) :: !preffix_chunks)
           |> Errs.raise_if_error;
           List.rev !preffix_chunks

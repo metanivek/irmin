@@ -20,6 +20,10 @@ open! Import
 module type S = sig
   include Irmin.Generic_key.S
 
+  val find_hash : start_at:commit_key -> hash:hash -> repo -> unit Lwt.t
+  val lookup_offset : repo -> int63 -> int -> unit
+  val debug_pp : repo -> unit Lwt.t
+
   val integrity_check :
     ?ppf:Format.formatter ->
     ?heads:commit list ->

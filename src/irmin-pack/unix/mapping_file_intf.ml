@@ -57,7 +57,7 @@ module type S = sig
   val open_map : root:string -> generation:int -> (t, [> open_error ]) result
   (** [open_map ~root ~generation] opens a mapping file. *)
 
-  val iter : t -> (off:int63 -> len:int -> unit) -> (unit, Errs.t) result
+  val iter : t -> (off:int63 -> len:int -> poff:int63 -> unit) -> (unit, Errs.t) result
   (** [iter mapping f] calls [f] on each [(off,len)] pair in [mapping].
 
       It is guaranteed for the offsets to be iterated in monotonic order.
@@ -67,7 +67,7 @@ module type S = sig
       The exceptions raised by [f] are caught and returned (as long as they are
       known by [Errs]). *)
 
-  val iter_exn : t -> (off:int63 -> len:int -> unit) -> unit
+  val iter_exn : t -> (off:int63 -> len:int -> poff:int63 -> unit) -> unit
   (** Similar to [iter mapping f] but raises exceptions. *)
 
   type entry = { off : int63; poff : int63; len : int }

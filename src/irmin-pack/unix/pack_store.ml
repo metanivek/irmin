@@ -92,9 +92,49 @@ struct
     | Direct { offset; _ } -> offset
 
   let index_direct_with_kind t hash =
+    (* Fmt.pr "index %a\n" pp_hash hash; *)
+    (* let count = ref 0 in *)
+    (* let open struct *)
+    (*   type indexed = (int63 * Pack_value.Kind.t * hash) list *)
+    (*   [@@deriving irmin ~pp] *)
+    (* end in *)
+    (* let objs = ref [] in *)
+    (* Index.iter *)
+    (*   (fun hash (offset, _len, kind) -> *)
+    (*     objs := (offset, kind, hash) :: !objs *)
+    (*     (\* match kind with *\) *)
+    (*     (\* | Pack_value.Kind.Commit_v2 | Pack_value.Kind.Commit_v1 -> *\) *)
+    (*     (\*     incr count; *\) *)
+    (*     (\*     objs := (offset, hash) :: !objs *\) *)
+    (*     (\* | _ -> () *\)) *)
+    (*   (Fm.index t.fm); *)
+    (* let sorted_objs : indexed = *)
+    (*   List.sort (fun (a, _, _) (b, _, _) -> Int63.compare a b) !objs *)
+    (* in *)
+
+    (* let oc = Out_channel.open_text "indexed.objs.json" in *)
+    (* let formatter = Format.formatter_of_out_channel oc in *)
+    (* Fmt.pf formatter "%a" Irmin.Type.(pp_json indexed_t) sorted_objs; *)
+    (* Out_channel.close oc; *)
+
+    (* let first n list = *)
+    (*   let rec aux n acc = function *)
+    (*     | [] -> acc *)
+    (*     | hd :: tl -> if n > 0 then aux (n - 1) (hd :: acc) tl else acc *)
+    (*   in *)
+    (*   aux n [] list |> List.rev *)
+    (* in *)
+    (* let slimmed = first 20 sorted_commits in *)
+    (* List.iter *)
+    (*   (fun (offset, hash) -> Fmt.pr "%a : %a\n" Int63.pp offset pp_hash hash) *)
+    (*   slimmed; *)
+
+    (* Fmt.pr "Commits %d\n" !count; *)
     [%log.debug "index %a" pp_hash hash];
     match Index.find (Fm.index t.fm) hash with
-    | None -> None
+    | None ->
+        Fmt.pr "NOT FOUND\n";
+        None
     | Some (offset, length, kind) ->
         let key = Pack_key.v_direct ~hash ~offset ~length in
         Some (key, kind)
@@ -228,6 +268,7 @@ struct
           true
 
   let unsafe_mem t k =
+    (* Fmt.pr "[pack] mem %a\n" pp_key k; *)
     [%log.debug "[pack] mem %a" pp_key k];
     match Pack_key.inspect k with
     | Indexed hash ->
@@ -319,6 +360,7 @@ struct
           Some v
 
   let unsafe_find ~check_integrity t k =
+    (* Fmt.pr "[pack] find %a\n" pp_key k; *)
     [%log.debug "[pack] find %a" pp_key k];
     let find_location = ref Stats.Pack_store.Not_found in
     let find_in_pack_file_guarded ~is_indexed =

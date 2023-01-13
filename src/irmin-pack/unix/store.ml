@@ -220,7 +220,12 @@ module Maker (Config : Conf.S) = struct
 
         let flush t = File_manager.flush ?hook:None t.fm |> Errs.raise_if_error
         let fsync t = File_manager.fsync t.fm |> Errs.raise_if_error
-        let reload t = File_manager.reload t.fm |> Errs.raise_if_error
+
+        let reload t =
+          File_manager.reload t.fm |> Errs.raise_if_error;
+          Contents.CA.purge_lru t.contents;
+          Node.CA.purge_lru t.node;
+          Commit.CA.purge_lru t.commit
 
         let split t =
           let open Result_syntax in
@@ -431,6 +436,36 @@ module Maker (Config : Conf.S) = struct
             in
             Lwt.try_bind (fun () -> f contents node commit) on_success on_fail
 
+        let debug_pp t =
+          let pl = File_manager.(Control.payload (control t.fm)) in
+          Fmt.pr "hello %a" Irmin.Type.(pp Control_file.Latest_payload.t) pl;
+          Lwt.return_unit
+
+        let lookup_offset t off len =
+          let dispatcher = t.dispatcher in
+          (* let accessor = *)
+          (*   Dispatcher.create_accessor_from_range_exn dispatcher ~off ~min_len:0 *)
+          (*     ~max_len:len *)
+          (* in *)
+          let accessor = Dispatcher.create_accessor_exn dispatcher ~off ~len in
+          Fmt.pr "accessor = %a\n"
+            Irmin.Type.(pp Dispatcher.accessor_t)
+            accessor;
+          let buffer = Bytes.create len in
+          Dispatcher.read_exn dispatcher accessor buffer;
+          let c = Bytes.get buffer Hash.hash_size in
+          Fmt.pr "magic = %c\n" c;
+
+          let index = File_manager.index t.fm in
+          index
+          |> File_manager.Index.iter @@ fun key (offset, _len, _kind) ->
+          Fmt.pr "%a\n" Int63.pp Int63.Syntax.(offset - off);
+             if Int63.(equal off offset) then
+               Fmt.pr "found key %a"
+                 Irmin.Type.(pp File_manager.Index.Key.t)
+                 key
+             else ()
+
         let close t =
           (* Step 1 - Kill the gc process if it is running *)
           let _ = Gc.cancel t in
@@ -447,6 +482,9 @@ module Maker (Config : Conf.S) = struct
 
     include Irmin.Of_backend (X)
     module Integrity_checks = Checks.Integrity_checks (XKey) (X) (Index)
+
+    let lookup_offset = X.Repo.lookup_offset
+    let debug_pp = X.Repo.debug_pp
 
     let integrity_check_inodes ?heads t =
       let* heads =
@@ -474,6 +512,50 @@ module Maker (Config : Conf.S) = struct
       in
       let index = File_manager.index t.fm in
       Integrity_checks.check_always ?ppf ~auto_repair ~check index
+
+    let find_hash ~(start_at : commit_key) ~(hash : hash) t =
+      Fmt.pr "Looking for %a\n" Irmin.Type.(pp Hash.t) hash;
+      let hashes = [ `Commit start_at ] in
+      let nothing _ = Lwt.return_unit in
+      let node = nothing in
+      let contents = nothing in
+      let hash_equal = Irmin.Type.(unstage (equal Hash.t)) in
+      let pred_node repo key =
+        try
+          X.Node.find (X.Repo.node_t repo) key >|= function
+          | None ->
+              Fmt.failwith "node with hash %a not found"
+                Irmin.Type.(pp Hash.t)
+                (XKey.to_hash key)
+          | Some v ->
+              let key_hash = XKey.to_hash key in
+              if hash_equal hash key_hash then
+                let () =
+                  Fmt.pr "found matching inode = %a\n"
+                    Irmin.Type.(pp XKey.t)
+                    key
+                in
+                []
+              else
+                let preds = X.Node.CA.Val.pred v in
+                List.rev_map
+                  (function
+                    | s, `Inode x ->
+                        assert (s = None);
+                        `Node x
+                    | _, `Node x -> `Node x
+                    | _, `Contents x -> `Contents x)
+                  preds
+        with _exn -> Lwt.return []
+      in
+      let pred_commit repo k =
+        let open Lwt.Syntax in
+        let* c = X.Commit.find (X.Repo.commit_t repo) k in
+        (match c with None -> [] | Some c -> [ `Node (X.Commit.Val.node c) ])
+        |> Lwt.return
+      in
+      Repo.iter ~cache_size:1_000_000 ~min:[] ~max:hashes ~contents ~node
+        ~pred_node ~pred_commit t
 
     let integrity_check_minimal ?ppf ?heads t =
       let* heads =

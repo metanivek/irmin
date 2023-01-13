@@ -250,7 +250,8 @@ module Make (Args : Gc_args.S) = struct
         stats := Gc_stats.Worker.finish_current_step !stats "prefix: transfer";
         (* Step 5.1. Transfer all. *)
         let append_exn = Ao.append_exn prefix in
-        let f ~off ~len =
+        let f ~off ~len ~poff =
+          ignore poff;
           let len = Int63.of_int len in
           Dispatcher.read_bytes_exn dispatcher ~f:append_exn ~off ~len
         in
