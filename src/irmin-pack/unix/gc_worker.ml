@@ -273,20 +273,19 @@ module Make (Args : Gc_args.S) = struct
          Update the parent commits to be dangling, but only if we are deleting
          the data: reopen the new prefix, this time in write-only as we have to
          modify data inside the file. *)
-      if Fm.gc_behaviour fm = `Delete then (
-        stats :=
-          Gc_stats.Worker.finish_current_step !stats
-            "prefix: rewrite commit parents";
-        let prefix = Sparse.Wo.open_wo ~mapping ~data |> Errs.raise_if_error in
-        Errors.finalise_exn (fun _outcome ->
-            Sparse.Wo.fsync prefix
-            >>= (fun _ -> Sparse.Wo.close prefix)
-            |> Errs.log_if_error "GC: Close prefix after parent rewrite")
-        @@ fun () ->
-        let write_exn = Sparse.Wo.write_exn prefix in
-        List.iter
-          (fun key -> transfer_parent_commit_exn ~write_exn key)
-          (Commit_value.parents commit))
+      stats :=
+        Gc_stats.Worker.finish_current_step !stats
+          "prefix: rewrite commit parents";
+      let prefix = Sparse.Wo.open_wo ~mapping ~data |> Errs.raise_if_error in
+      Errors.finalise_exn (fun _outcome ->
+          Sparse.Wo.fsync prefix
+          >>= (fun _ -> Sparse.Wo.close prefix)
+          |> Errs.log_if_error "GC: Close prefix after parent rewrite")
+      @@ fun () ->
+      let write_exn = Sparse.Wo.write_exn prefix in
+      List.iter
+        (fun key -> transfer_parent_commit_exn ~write_exn key)
+        (Commit_value.parents commit)
     in
     let () = report_new_file_sizes ~root ~generation stats |> ignore in
 
