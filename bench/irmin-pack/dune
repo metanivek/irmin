@@ -85,6 +85,11 @@
  (modules trace_stats)
  (libraries cmdliner irmin_traces))
 
+(executable
+ (name tezos_read)
+ (modules tezos_read)
+ (libraries cmdliner irmin-pack irmin-pack.unix irmin-tezos))
+
 ;; Require the executables to compile during tests
 
 (rule
