@@ -99,6 +99,20 @@ module Serde = struct
         let of_bin_string = Irmin.Type.(unstage (of_bin_string t))
       end
 
+      module Plv5' = struct
+        include Payload.Upper.V5'
+
+        let checksum_encode_bin = Irmin.Type.(unstage (pre_hash t))
+        let set_checksum payload checksum = { payload with checksum }
+        let get_checksum payload = payload.checksum
+
+        let is_checksum_valid payload =
+          Checksum.is_valid ~payload ~encode_bin:checksum_encode_bin
+            ~set_checksum ~get_checksum
+
+        let of_bin_string = Irmin.Type.(unstage (of_bin_string t))
+      end
+
       module Plv5 = struct
         include Payload.Upper.V5
 
@@ -125,10 +139,12 @@ module Serde = struct
       and version = Payload.Upper.version =
         | V3 of Plv3.t
         | V4 of Plv4.t
+        | V5' of Plv5'.t
         | V5 of Plv5.t
 
       let to_bin_string = function
-        | Invalid _ | Valid (V3 _) | Valid (V4 _) -> assert false
+        | Invalid _ | Valid (V3 _) | Valid (V4 _) | Valid (V5' _) ->
+            assert false
         | Valid (V5 payload) ->
             let payload = Plv5.set_checksum payload in
             Version.to_bin `V5 ^ Plv5.to_bin_string payload
@@ -147,13 +163,21 @@ module Serde = struct
               | false -> Invalid (V4 payload)
               | true -> Valid (V4 payload))
               |> Result.ok
-          | `V5 ->
-              Plv5.of_bin_string payload >>= fun payload ->
-              (match Plv5.is_checksum_valid payload with
-              | false -> Invalid (V5 payload)
-              | true -> Valid (V5 payload))
-              |> Result.ok
+          | `V5 -> (
+              match Plv5.of_bin_string payload with
+              | Ok payload ->
+                  (match Plv5.is_checksum_valid payload with
+                  | false -> Invalid (V5 payload)
+                  | true -> Valid (V5 payload))
+                  |> Result.ok
+              | Error _ ->
+                  Plv5'.of_bin_string payload >>= fun payload ->
+                  (match Plv5'.is_checksum_valid payload with
+                  | false -> Invalid (V5' payload)
+                  | true -> Valid (V5' payload))
+                  |> Result.ok)
         in
+
         match route_version () with
         | Ok _ as x -> x
         | Error _ -> Error (`Corrupted_control_file ctx)
@@ -232,6 +256,38 @@ module Serde = struct
         volume_num = 0;
       }
 
+    let upgrade_from_v5' (pl : Payload.Upper.V5'.t) : payload =
+      let upgrade_status = function
+        | Payload.Upper.V5'.From_v1_v2_post_upgrade x ->
+            Latest.From_v1_v2_post_upgrade x
+        | No_gc_yet -> No_gc_yet
+        | Used_non_minimal_indexing_strategy ->
+            Used_non_minimal_indexing_strategy
+        | Gced x ->
+            Gced
+              {
+                suffix_start_offset = x.suffix_start_offset;
+                generation = x.generation;
+                latest_gc_target_offset = x.latest_gc_target_offset;
+                suffix_dead_bytes = x.suffix_dead_bytes;
+                mapping_end_poff = None;
+              }
+        | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13
+        | T14 | T15 ->
+            (* Unreachable *)
+            assert false
+      in
+      {
+        dict_end_poff = pl.dict_end_poff;
+        appendable_chunk_poff = pl.appendable_chunk_poff;
+        checksum = Int63.zero;
+        chunk_start_idx = pl.chunk_start_idx;
+        chunk_num = pl.chunk_num;
+        status = upgrade_status pl.status;
+        upgraded_from = Some (Version.to_int `V5);
+        volume_num = 0;
+      }
+
     let of_bin_string ctx string =
       let open Result_syntax in
       let* payload = Data.of_bin_string ctx string in
@@ -239,6 +295,7 @@ module Serde = struct
       | Invalid _ -> Error (`Corrupted_control_file ctx)
       | Valid (V3 payload) -> Ok (upgrade_from_v3 payload)
       | Valid (V4 payload) -> Ok (upgrade_from_v4 payload)
+      | Valid (V5' payload) -> Ok (upgrade_from_v5' payload)
       | Valid (V5 payload) -> Ok payload
 
     (* Similar yo [of_bin_string] but skips version upgrade *)

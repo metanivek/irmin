@@ -192,6 +192,64 @@ module Payload = struct
           - [suffix_end_poff] is replaced by [appendable_chunk_poff] *)
     end
 
+    module V5' = struct
+      type gced = V4.gced = {
+        suffix_start_offset : int63;
+        generation : int;
+        latest_gc_target_offset : int63;
+        suffix_dead_bytes : int63;
+      }
+      [@@deriving irmin]
+
+      type status =
+        | From_v1_v2_post_upgrade of V3.from_v1_v2_post_upgrade
+        | No_gc_yet
+        | Used_non_minimal_indexing_strategy
+        | Gced of gced
+        | T1
+        | T2
+        | T3
+        | T4
+        | T5
+        | T6
+        | T7
+        | T8
+        | T9
+        | T10
+        | T11
+        | T12
+        | T13
+        | T14
+        | T15
+      [@@deriving irmin]
+
+      type t = {
+        dict_end_poff : int63;
+        appendable_chunk_poff : int63;
+        upgraded_from : int option;
+        checksum : int63;
+        chunk_start_idx : int;
+        chunk_num : int;
+        volume_num : int;
+        status : status; (* must be last to allow extensions *)
+      }
+      [@@deriving irmin]
+      (** The same as {!V4.t}, with the following modifications:
+
+          New fields
+
+          - [volume_num] stores the number of volumes in the lower layer.
+          - [mapping_end_poff] stores the mapping file size (optional if missing
+            or unknown after a migration from V4).
+
+          Changed fields
+
+          - Replaced [upgraded_from_v3_to_v4] with generic field [upgraded_from]
+            to track version upgrades. Note, it is an [int option] since
+            [Version.t option] has a bug somewhere in repr that needs further
+            investigation. *)
+    end
+
     module V5 = struct
       type gced = {
         suffix_start_offset : int63;
@@ -251,7 +309,8 @@ module Payload = struct
             investigation. *)
     end
 
-    type version = V3 of V3.t | V4 of V4.t | V5 of V5.t [@@deriving irmin]
+    type version = V3 of V3.t | V4 of V4.t | V5' of V5'.t | V5 of V5.t
+    [@@deriving irmin]
 
     type raw_payload = Valid of version | Invalid of version
     [@@deriving irmin]
