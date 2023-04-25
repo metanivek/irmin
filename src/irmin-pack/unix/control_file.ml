@@ -285,7 +285,7 @@ module Serde = struct
         chunk_num = pl.chunk_num;
         status = upgrade_status pl.status;
         upgraded_from = Some (Version.to_int `V5);
-        volume_num = 0;
+        volume_num = pl.volume_num;
       }
 
     let of_bin_string ctx string =
