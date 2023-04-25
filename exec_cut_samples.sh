@@ -4,6 +4,7 @@
 OUT=sample_cut
 SAMPLE=1000   # for upper, lower will be multiplied by 50
 LRU_SIZE=5000 # tezos lru size -- TINY
+# LRU_SIZE=100000 # default irmin pack LRU size
 CUT=35426804898
 
 ./sample_store_cut.sh $OUT $SAMPLE $LRU_SIZE 0 $CUT

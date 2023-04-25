@@ -69,7 +69,7 @@ bench() {
   echo "Lower, $root"
   clear_cache
   if [ -n "$lower_root" ]; then
-    $CMD --root="$root" --lower-root="$lower_root" --read-every="$READ_EVERY_LOWER" --lru-size="$LRU" --cut-offset="$CUT_OFFSET" --high-to-low=false--cut-side=Below >"$lower"
+    $CMD --root="$root" --lower-root="$lower_root" --read-every="$READ_EVERY_LOWER" --lru-size="$LRU" --cut-offset="$CUT_OFFSET" --high-to-low=false --cut-side=Below >"$lower"
   else
     $CMD --root="$root" --read-every="$READ_EVERY_LOWER" --lru-size="$LRU" --cut-offset="$CUT_OFFSET" --high-to-low=false --cut-side=Below >"$lower"
   fi
