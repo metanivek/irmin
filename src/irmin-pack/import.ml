@@ -27,3 +27,10 @@ module Int63 = struct
 end
 
 type int63 = Int63.t [@@deriving irmin]
+
+module Mem = struct
+  let bytes_per_word = Sys.word_size / 8
+
+  let reachable_bytes o =
+    Obj.repr o |> Obj.reachable_words |> Int.mul bytes_per_word
+end
