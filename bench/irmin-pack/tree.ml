@@ -40,6 +40,7 @@ type config = {
   gc_distance_in_the_past : int;
   gc_wait_after : int;
   add_volume_every : int;
+  lru_max_memory : int option;
 }
 
 module type Store = sig
@@ -251,9 +252,16 @@ module Make_store_pack (Conf : Irmin_pack.Conf.S) = struct
       if config.add_volume_every > 0 then Some (Filename.concat root "lower")
       else None
     in
+    let lru_max_memory =
+      match config.lru_max_memory with
+      | None -> None
+      | Some x ->
+        Fmt.epr "setting lru max memory to %dmb@." x;
+        Some (`Megabyte x)
+    in
     let conf =
       Irmin_pack.config ~readonly:false ~fresh:true ~indexing_strategy
-        ~lower_root root
+        ~lower_root ~lru_max_memory root
     in
     prepare_artefacts_dir root;
     let* repo = Store.Repo.v conf in
@@ -301,12 +309,23 @@ let store_of_config config =
 
 type suite_elt = {
   mode : [ `Read_trace | `Chains | `Large ];
-  speed : [ `Quick | `Slow | `Custom ];
+  speed : [ `Quick | `Slow | `Custom | `Trace ];
   run : config -> (Format.formatter -> unit) Lwt.t;
 }
 
 let suite : suite_elt list =
   [
+    {
+      mode = `Read_trace;
+      speed = `Trace;
+      run =
+        (fun config ->
+          let config =
+            { config with inode_config = (32, 256); store_type = `Pack }
+          in
+          let (module Store) = store_of_config config in
+          Store.run_read_trace config);
+    };
     {
       mode = `Read_trace;
       speed = `Quick;
@@ -391,14 +410,17 @@ let get_suite suite_filter =
           (* The suite contains several `Read_trace benchmarks, let's keep the
              slow one only *)
           true
+      | `Trace, `Trace, _ -> true
       | `Slow, _, `Read_trace -> false
       | `Slow, (`Slow | `Quick), _ -> true
       | `Quick, `Quick, _ -> true
       | `Custom_trace, `Custom, `Read_trace -> true
       | `Custom_chains, `Custom, `Chains -> true
       | `Custom_large, `Custom, `Large -> true
-      | (`Slow | `Quick | `Custom_trace | `Custom_chains | `Custom_large), _, _
-        ->
+      | ( ( `Slow | `Quick | `Custom_trace | `Custom_chains | `Custom_large
+          | `Trace ),
+          _,
+          _ ) ->
           false)
     suite
 
@@ -406,7 +428,7 @@ let main () ncommits number_of_commits_to_replay suite_filter inode_config
     store_type freeze_commit path_conversion depth width nchain_trees
     nlarge_trees replay_trace_path artefacts_path keep_store keep_stat_trace
     no_summary empty_blobs gc_every gc_distance_in_the_past gc_wait_after
-    add_volume_every =
+    add_volume_every lru_max_memory =
   let default = match suite_filter with `Quick -> 10000 | _ -> 13315 in
   let number_of_commits_to_replay =
     Option.value ~default number_of_commits_to_replay
@@ -434,6 +456,7 @@ let main () ncommits number_of_commits_to_replay suite_filter inode_config
       gc_distance_in_the_past;
       gc_wait_after;
       add_volume_every;
+      lru_max_memory;
     }
   in
   Printexc.record_backtrace true;
@@ -472,10 +495,11 @@ let mode =
       ("trace", `Custom_trace);
       ("chains", `Custom_chains);
       ("large", `Custom_large);
+      ("trace", `Trace);
     ]
   in
   let doc = Arg.info ~doc:(Arg.doc_alts_enum mode) [ "mode" ] in
-  Arg.(value @@ opt (Arg.enum mode) `Slow doc)
+  Arg.(value @@ opt (Arg.enum mode) `Trace doc)
 
 let inode_config =
   let doc = Arg.info ~doc:"Inode config" [ "inode-config" ] in
@@ -618,6 +642,12 @@ let add_volume_every =
   let doc = Arg.info ~doc:"Add volume ever N GCs" [ "add-volume-every" ] in
   Arg.(value @@ opt int 0 doc)
 
+let lru_max_memory =
+  let doc =
+    Arg.info ~doc:"Set max memory for LRU (in megabytes)" [ "lru-max-memory" ]
+  in
+  Arg.(value @@ opt (some int) None doc)
+
 let main_term =
   Term.(
     const main
@@ -642,7 +672,8 @@ let main_term =
     $ gc_every
     $ gc_distance_in_the_past
     $ gc_wait_after
-    $ add_volume_every)
+    $ add_volume_every
+    $ lru_max_memory)
 
 let deprecated_info = (Term.info [@alert "-deprecated"])
 let deprecated_exit = (Term.exit [@alert "-deprecated"])
