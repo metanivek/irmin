@@ -97,11 +97,20 @@ module Mem = struct
   let maxrss_delta ?(c = fun () -> ()) s f =
     let before = max_rss () in
     let x = f () in
-    Unix.sleepf 0.1;
     let after = max_rss () in
     let delta = after - before in
     if delta > 0 then (
       Printf.eprintf "[%s] maxrss delta %d = %d - %d\n" s delta after before;
+      c ());
+    x
+
+  let allocated_bytes ?(c = fun () -> ()) s f =
+    let before = Irmin_pack.Gc.allocated_bytes () in
+    let x = f () in
+    let after = Irmin_pack.Gc.allocated_bytes () in
+    let delta = after -. before in
+    if delta > 0.0 then (
+      Printf.eprintf "[%s] alloc bytes delta %.0f = %.0f - %.0f\n" s delta after before;
       c ());
     x
 end

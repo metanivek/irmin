@@ -44,9 +44,7 @@ let create config =
     | None -> (Irmin_pack.Conf.lru_size config, None)
     | Some b -> (-42, calculate_weight_limit b |> Option.some)
   in
-  let lru =
-    Mem.maxrss_delta "LRU.create" @@ fun () -> Internal.create lru_size
-  in
+  let lru = Internal.create lru_size in
   { lru; weight_limit; total_weight = 0 }
 
 let lru_enabled t = match t.weight_limit with None -> true | Some x -> x > 0
@@ -57,12 +55,13 @@ let add t k w v =
     let add t k v w =
       let n = { v; weight = w } in
       t.total_weight <- t.total_weight + w;
-      let c () =
-        let s = Internal.size t.lru in
-        Printf.eprintf "[LRU] V: %d, N: %d (%d)\n" (Mem.reachable_bytes v)
-          (Mem.reachable_bytes n) s
-      in
-      Mem.maxrss_delta ~c "LRU.add" @@ fun () -> Internal.add t.lru k n
+      (* let c () = *)
+      (*   let s = Internal.size t.lru in *)
+      (*   Printf.eprintf "[LRU] V: %d, N: %d (%d)\n" (Mem.reachable_bytes v) *)
+      (*     (Mem.reachable_bytes n) s *)
+      (* in *)
+      (* Mem.maxrss_delta ~c "LRU.add" @@ fun () -> Internal.add t.lru k n *)
+      Internal.add t.lru k n
     in
     match t.weight_limit with
     | None -> add t k v 0
@@ -75,10 +74,7 @@ let add t k w v =
         done
 
 let v v = v.v
-
-let find { lru; _ } k =
-  Mem.maxrss_delta "LRU.find" @@ fun () -> Internal.find lru k |> v
-
+let find { lru; _ } k = Internal.find lru k |> v
 let mem { lru; _ } k = Internal.mem lru k
 let clear { lru; _ } = Internal.clear lru
 let iter { lru; _ } f = Internal.iter lru (fun k wv -> f k (v wv))

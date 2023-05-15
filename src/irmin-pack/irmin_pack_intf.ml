@@ -119,4 +119,6 @@ module type Sigs = sig
 
   module Layout = Layout
   module Version = Version
+
+  module Gc : module type of Gc
 end

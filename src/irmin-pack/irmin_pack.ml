@@ -31,3 +31,4 @@ module Layout = Layout
 module Inode = Inode
 module Pack_key = Pack_key
 module Pack_value = Pack_value
+module Gc = Gc
