@@ -51,7 +51,7 @@ struct
     include Lru
 
     let add t k v =
-      Printf.eprintf "[PACK] V: %d | " (Mem.reachable_bytes v);
+      (* Printf.eprintf "[PACK] V: %d | " (Mem.reachable_bytes v); *)
       Val.to_kinded v |> add t k (fun () -> Val.weight v)
 
     let find t k = find t k |> Val.of_kinded

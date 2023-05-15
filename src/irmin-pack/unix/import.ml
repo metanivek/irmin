@@ -89,4 +89,19 @@ module Mem = struct
 
   let reachable_bytes o =
     Obj.repr o |> Obj.reachable_words |> Int.mul bytes_per_word
+
+  let max_rss () =
+    let Rusage.{ maxrss; _ } = Rusage.(get Self) in
+    maxrss |> Int64.to_int
+
+  let maxrss_delta ?(c = fun () -> ()) s f =
+    let before = max_rss () in
+    let x = f () in
+    Unix.sleepf 0.1;
+    let after = max_rss () in
+    let delta = after - before in
+    if delta > 0 then (
+      Printf.eprintf "[%s] maxrss delta %d = %d - %d\n" s delta after before;
+      c ());
+    x
 end
