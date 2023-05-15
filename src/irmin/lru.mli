@@ -25,4 +25,5 @@ module Make (H : Hashtbl.HashedType) : sig
   val clear : 'a t -> unit
   val iter : 'a t -> (H.t -> 'a -> unit) -> unit
   val drop : 'a t -> 'a option
+  val size : 'a t -> int
 end

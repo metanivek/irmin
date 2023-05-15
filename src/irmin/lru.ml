@@ -150,4 +150,6 @@ module Make (H : Hashtbl.HashedType) = struct
     t.w <- 0;
     HT.clear t.ht;
     Q.clear t.q
+
+  let size t = HT.length t.ht
 end

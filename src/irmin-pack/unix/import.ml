@@ -83,3 +83,10 @@ module Varint = struct
       [63 / 7] equals [9]. *)
   let max_encoded_size = 9
 end
+
+module Mem = struct
+  let bytes_per_word = Sys.word_size / 8
+
+  let reachable_bytes o =
+    Obj.repr o |> Obj.reachable_words |> Int.mul bytes_per_word
+end

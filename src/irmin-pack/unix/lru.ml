@@ -55,6 +55,9 @@ let add t k w v =
     let add t k v w =
       let n = { v; weight = w } in
       t.total_weight <- t.total_weight + w;
+      let s = Internal.size t.lru in
+      Printf.eprintf "[LRU] V: %d, N: %d (%d)\n" (Mem.reachable_bytes v)
+        (Mem.reachable_bytes n) s;
       Internal.add t.lru k n
     in
     match t.weight_limit with
