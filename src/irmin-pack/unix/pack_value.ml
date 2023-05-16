@@ -14,10 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+include Import
 include Irmin_pack.Pack_value
 
 module type Persistent = sig
   type hash
 
   include S with type hash := hash and type key = hash Pack_key.t
+
+  (* type 'a cache_key *)
+  (* val cache_key : int63 -> t cache_key *)
 end

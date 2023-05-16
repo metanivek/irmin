@@ -16,20 +16,50 @@
 
 open Import
 
-type t
-(** An LRU that support memory-bound capacity via configuration key
-    [lru_max_memory]. Falls back to entry-based capacity via [lru_size]
-    configuration key, if max memory is not configured. *)
+module type S = sig
+  type 'a key
 
-type key = int63
-type value = Irmin_pack.Pack_value.kinded
+  type t
+  (** An LRU that support memory-bound capacity via configuration key
+      [lru_max_memory]. Falls back to entry-based capacity via [lru_size]
+      configuration key, if max memory is not configured. *)
 
-val create : Irmin.Backend.Conf.t -> t
+  val create : Irmin.Backend.Conf.t -> t
 
-val add : t -> int63 -> (unit -> int) -> value -> unit
-(** [add t key weight value] maps [value] with [weight] to [key] in [t]. *)
+  val add : t -> 'a key -> (unit -> int) -> 'a -> unit
+  (** [add t key weight value] maps [value] with [weight] to [key] in [t]. *)
 
-val find : t -> key -> value
-val mem : t -> key -> bool
-val clear : t -> unit
-val iter : t -> (key -> value -> unit) -> unit
+  val find : t -> 'a key -> 'a
+  val mem : t -> 'a key -> bool
+  val clear : t -> unit
+
+  (* val iter : t -> < f : 'a. 'a key -> 'a -> unit > -> unit *)
+  val drop : t -> int option
+  val size : t -> int
+end
+
+module Make_single (Val : Pack_value.Persistent) : sig
+  module Key : sig
+    type _ t = Value : int63 -> Val.t t
+  end
+
+  type 'a key = 'a Key.t
+
+  include S with type 'a key := 'a Key.t
+end
+
+module Make
+    (Commit : Irmin_pack.Pack_value.S)
+    (Inode : Irmin_pack.Pack_value.S)
+    (Contents : Irmin_pack.Pack_value.S) : sig
+  module Key : sig
+    type _ t =
+      | Commit : int63 -> Commit.t t
+      | Inode : int63 -> Inode.t t
+      | Contents : int63 -> Contents.t t
+  end
+
+  type 'a key = 'a Key.t
+
+  include S with type 'a key := 'a Key.t
+end

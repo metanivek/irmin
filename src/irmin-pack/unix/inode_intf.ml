@@ -23,13 +23,14 @@ module type Persistent = sig
   type file_manager
   type dict
   type dispatcher
+  type lru
 
   val v :
     config:Irmin.Backend.Conf.t ->
     fm:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
-    lru:Lru.t ->
+    lru:lru ->
     read t
 
   include Irmin_pack.Checkable with type 'a t := 'a t and type hash := hash
@@ -91,5 +92,6 @@ module type Sigs = sig
        and type file_manager = Pack.file_manager
        and type dict = Pack.dict
        and type dispatcher = Pack.dispatcher
+       and type lru = Pack.lru
        and type value = Inter.Val.t
 end

@@ -26,6 +26,8 @@ module type S = sig
   type hash
   type key = hash Pack_key.t [@@deriving irmin]
 
+  module Pack_lru : Lru.S
+
   module Hash : sig
     val hash_size : int
   end
@@ -53,7 +55,7 @@ module type S = sig
       fm:Fm.t ->
       dict:Dict.t ->
       dispatcher:Dispatcher.t ->
-      lru:Lru.t ->
+      lru:Pack_lru.t ->
       read t
 
     val unsafe_find :
@@ -80,5 +82,6 @@ module type S = sig
        and type file_manager = Fm.t
        and type dict = Dict.t
        and type dispatcher = Dispatcher.t
+       and type lru = Pack_lru.t
        and type hash = hash
 end

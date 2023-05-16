@@ -39,6 +39,7 @@ struct
   type file_manager = Pack.file_manager
   type dict = Pack.dict
   type dispatcher = Pack.dispatcher
+  type lru = Pack.lru
 
   let to_snapshot = Inter.to_snapshot
 

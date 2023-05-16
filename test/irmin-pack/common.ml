@@ -61,6 +61,9 @@ module Contents = struct
 
   module H = Irmin.Hash.Typed (Irmin.Hash.SHA1) (Irmin.Contents.String)
 
+  type hash = H.t
+  type key = hash Irmin_pack_unix.Pack_key.t
+
   let hash = H.hash
   let magic = 'B'
   let weight _ = 1
@@ -88,10 +91,19 @@ module File_manager = Irmin_pack_unix.File_manager.Make (Io) (Index) (Errs)
 module Dict = Irmin_pack_unix.Dict.Make (File_manager)
 module Dispatcher = Irmin_pack_unix.Dispatcher.Make (File_manager)
 
+module Lru = struct
+  include Irmin_pack_unix.Lru.Make_single (Contents)
+
+  type pack_value = Contents.t
+
+  let cache_key off = Key.Value off
+end
+
 module Pack =
   Irmin_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
     (Schema.Hash)
     (Contents)
+    (Lru)
     (Errs)
 
 module Branch =
@@ -157,7 +169,7 @@ struct
     (* open the index created by the fm. *)
     let index = File_manager.index fm in
     let dict = Dict.v fm |> Errs.raise_if_error in
-    let lru = Irmin_pack_unix.Lru.create config in
+    let lru = Lru.create config in
     let pack = Pack.v ~config ~fm ~dict ~dispatcher ~lru in
     (f := fun () -> File_manager.flush fm |> Errs.raise_if_error);
     { name; index; pack; dict; fm } |> Lwt.return

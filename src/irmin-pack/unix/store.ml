@@ -45,28 +45,80 @@ module Maker (Config : Conf.S) = struct
       type 'a value = { hash : H.t; kind : Pack_value.Kind.t; v : 'a }
       [@@deriving irmin]
 
+      module Contents_value = Pack_value.Of_contents (Config) (H) (XKey) (C)
+
+      module Inode_value = struct
+        module Key = XKey
+        module Node = Schema.Node (Key) (Key)
+        module Inter = Irmin_pack.Inode.Make_internal (Config) (H) (Key) (Node)
+        include Inter.Raw
+      end
+
+      module Commit_value = struct
+        module Value = struct
+          include Schema.Commit (Inode_value.Key) (XKey)
+          module Info = Schema.Info
+
+          type hash = Hash.t [@@deriving irmin]
+        end
+
+        include Pack_value.Of_commit (H) (XKey) (Value)
+      end
+
+      module Pack_lru = Lru.Make (Commit_value) (Inode_value) (Contents_value)
+
+      (*
+
+          Make LRU with Pack values
+
+          Make specialized LRUs for each pack store that give a cache key (?)
+
+
+
+
+
+         *)
+
       module Contents = struct
-        module Pack_value = Pack_value.Of_contents (Config) (H) (XKey) (C)
+        (* module Pack_value = Pack_value.Of_contents (Config) (H) (XKey) (C) *)
+        module Contents_pack_lru = struct
+          include Pack_lru
+
+          type pack_value = Contents_value.t
+
+          let cache_key off = Key.Contents off
+        end
 
         module CA =
-          Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Pack_value)
+          Pack_store.Make (File_manager) (Dict) (Dispatcher) (H)
+            (Contents_value)
+            (Contents_pack_lru)
             (Errs)
 
         include Irmin.Contents.Store_indexable (CA) (H) (C)
       end
 
       module Node = struct
-        module Value = Schema.Node (XKey) (XKey)
+        module Value = Inode_value.Node
+        (* module Value = Schema.Node (XKey) (XKey) *)
+        module Node_pack_lru = struct
+          include Pack_lru
+
+          type pack_value = Inode_value.t
+
+          let cache_key off = Key.Inode off
+        end
 
         module CA = struct
-          module Inter =
-            Irmin_pack.Inode.Make_internal (Config) (H) (XKey) (Value)
+          (* module Inter = *)
+          (*   Irmin_pack.Inode.Make_internal (Config) (H) (XKey) (Value) *)
 
           module Pack' =
-            Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Inter.Raw)
+            Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Inode_value)
+              (Node_pack_lru)
               (Errs)
 
-          include Inode.Make_persistent (H) (Value) (Inter) (Pack')
+          include Inode.Make_persistent (H) (Value) (Inode_value.Inter) (Pack')
         end
 
         include
@@ -81,17 +133,27 @@ module Maker (Config : Conf.S) = struct
       end
 
       module Commit = struct
-        module Value = struct
-          include Schema.Commit (Node.Key) (XKey)
-          module Info = Schema.Info
+        (* module Value = struct *)
+        (*   include Schema.Commit (Node.Key) (XKey) *)
+        (*   module Info = Schema.Info *)
 
-          type hash = Hash.t [@@deriving irmin]
+        (*   type hash = Hash.t [@@deriving irmin] *)
+        (* end *)
+
+        (* module Pack_value = Pack_value.Of_commit (H) (XKey) (Value) *)
+
+        module Value = Commit_value.Value
+        module Commit_pack_lru = struct
+          include Pack_lru
+
+          type pack_value = Commit_value.t
+
+          let cache_key off = Key.Commit off
         end
 
-        module Pack_value = Pack_value.Of_commit (H) (XKey) (Value)
-
         module CA =
-          Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Pack_value)
+          Pack_store.Make (File_manager) (Dict) (Dispatcher) (H) (Commit_value)
+            (Commit_pack_lru)
             (Errs)
 
         include
@@ -135,10 +197,11 @@ module Maker (Config : Conf.S) = struct
         module Dispatcher = Dispatcher
         module Hash = Schema.Hash
         module Contents_store = Contents.CA
-        module Node_value = Node.CA.Inter.Val
+        module Node_value = Inode_value.Inter.Val
         module Node_store = Node.CA
         module Commit_value = Commit.Value
         module Commit_store = Commit.CA
+        module Pack_lru = Pack_lru
 
         type hash = Node_value.hash
         type key = Node_value.node_key [@@deriving irmin]
@@ -148,7 +211,7 @@ module Maker (Config : Conf.S) = struct
         type running_gc = { gc : Gc.t; use_auto_finalisation : bool }
 
         type t = {
-          lru : Lru.t;
+          lru : Pack_lru.t;
           config : Irmin.Backend.Conf.t;
           contents : read Contents.CA.t;
           node : read Node.CA.t;
@@ -188,7 +251,7 @@ module Maker (Config : Conf.S) = struct
           in
           let dict = Dict.v fm |> Errs.raise_if_error in
           let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
-          let lru = Lru.create config in
+          let lru = Pack_lru.create config in
           let contents = Contents.CA.v ~config ~fm ~dict ~dispatcher ~lru in
           let node = Node.CA.v ~config ~fm ~dict ~dispatcher ~lru in
           let commit = Commit.CA.v ~config ~fm ~dict ~dispatcher ~lru in
@@ -678,8 +741,8 @@ module Maker (Config : Conf.S) = struct
       module Index = Index
       module Inode = X.Node.CA
       module Dict = Dict
-      module Contents = X.Contents.Pack_value
-      module Commit = X.Commit.Pack_value
+      module Contents = X.Contents_value
+      module Commit = X.Commit_value
     end)
 
     let traverse_pack_file = Traverse_pack_file.run

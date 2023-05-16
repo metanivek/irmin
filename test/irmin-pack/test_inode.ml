@@ -49,10 +49,19 @@ struct
   module Dict = Irmin_pack_unix.Dict.Make (File_manager)
   module Dispatcher = Irmin_pack_unix.Dispatcher.Make (File_manager)
 
+  module Inode_lru = struct
+    include Irmin_pack_unix.Lru.Make_single (Inter.Raw)
+
+    type pack_value = Inter.Raw.t
+
+    let cache_key off = Key.Value off
+  end
+
   module Pack =
     Irmin_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Inter.Raw)
+      (Inode_lru)
       (Errs)
 
   module Inode =
@@ -62,10 +71,19 @@ struct
     Irmin_pack.Pack_value.Of_contents (Conf) (Schema.Hash) (Key)
       (Schema.Contents)
 
+  module Contents_lru = struct
+    include Irmin_pack_unix.Lru.Make_single (Contents_value)
+
+    type pack_value = Contents_value.t
+
+    let cache_key off = Key.Value off
+  end
+
   module Contents_store =
     Irmin_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Contents_value)
+      (Contents_lru)
       (Errs)
 
   module Context = struct
@@ -116,10 +134,9 @@ struct
       let fm = get_fm config in
       let dict = Dict.v fm |> Errs.raise_if_error in
       let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
-      let lru = Irmin_pack_unix.Lru.create config in
-      let store = Inode.v ~config ~fm ~dict ~dispatcher ~lru in
+      let store = Inode.v ~config ~fm ~dict ~dispatcher ~lru:(Inode_lru.create config) in
       let store_contents =
-        Contents_store.v ~config ~fm ~dict ~dispatcher ~lru
+        Contents_store.v ~config ~fm ~dict ~dispatcher ~lru:(Contents_lru.create config)
       in
       let+ foo, bar =
         Contents_store.batch store_contents (fun writer ->

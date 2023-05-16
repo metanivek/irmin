@@ -39,6 +39,7 @@ module Make_without_close_checks
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
+    (Lru : Pack_lru with type pack_value = Val.t)
     (Errs : Io_errors.S with module Io = Fm.Io) =
 struct
   module Tbl = Table (Hash)
@@ -50,17 +51,22 @@ struct
   module Lru = struct
     include Lru
 
-    let add t k v =
-      let c () = Printf.eprintf "[PACK] V: %d | " (Mem.reachable_bytes v) in
-      Mem.allocated_bytes ~c "Pack.Lru.add" @@ fun () ->
-      Val.to_kinded v |> add t k (fun () -> Val.weight v)
+    let find t k = find t (cache_key k)
+    let mem t k = mem t (cache_key k)
 
-    let find t k = find t k |> Val.of_kinded
+    let add t k v =
+      let cache_k = cache_key k in
+      let weight () = Val.weight v in
+      let c () = Printf.eprintf "[PACK] V: %d | " (Mem.reachable_bytes v) in
+      Mem.allocated_bytes ~c "Pack.Lru.add" @@ fun () -> add t cache_k weight v
+    (* Val.to_kinded v |> add t k (fun () -> Val.weight v) *)
+    (* let find t k = find t k |> Val.of_kinded *)
   end
 
   type file_manager = Fm.t
   type dict = Dict.t
   type dispatcher = Dispatcher.t
+  type lru = Lru.t
 
   type 'a t = {
     lru : Lru.t;
@@ -522,10 +528,11 @@ module Make
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
+    (Lru : Pack_lru with type pack_value = Val.t)
     (Errs : Io_errors.S with module Io = Fm.Io) =
 struct
   module Inner =
-    Make_without_close_checks (Fm) (Dict) (Dispatcher) (Hash) (Val) (Errs)
+    Make_without_close_checks (Fm) (Dict) (Dispatcher) (Hash) (Val) (Lru) (Errs)
 
   include Inner
   include Indexable.Closeable (Inner)

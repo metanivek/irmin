@@ -27,13 +27,14 @@ module type S = sig
   type file_manager
   type dict
   type dispatcher
+  type lru
 
   val v :
     config:Irmin.Backend.Conf.t ->
     fm:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
-    lru:Lru.t ->
+    lru:lru ->
     read t
 
   val cast : read t -> read_write t
@@ -83,11 +84,20 @@ module type S = sig
   (** Returns the length of the object associated with the key. *)
 end
 
+module type Pack_lru = sig
+  include Lru.S
+
+  type pack_value
+
+  val cache_key : int63 -> pack_value key
+end
+
 module type Sigs = sig
   exception Invalid_read of string
   exception Dangling_hash
 
   module type S = S
+  module type Pack_lru = Pack_lru
 
   module Make
       (Fm : File_manager.S)
@@ -97,6 +107,7 @@ module type Sigs = sig
       (Val : Pack_value.Persistent
                with type hash := Hash.t
                 and type key := Hash.t Pack_key.t)
+      (Lru : Pack_lru with type pack_value = Val.t)
       (Errs : Io_errors.S with module Io = Fm.Io) :
     S
       with type key = Hash.t Pack_key.t
@@ -105,4 +116,5 @@ module type Sigs = sig
        and type file_manager = Fm.t
        and type dispatcher = Dispatcher.t
        and type dict = Dict.t
+       and type lru = Lru.t
 end

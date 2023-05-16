@@ -97,7 +97,7 @@ module Make (H : Hashtbl.HashedType) = struct
         t.w <- t.w - 1;
         HT.remove t.ht k;
         Q.detach t.q n;
-        Some v
+        Some (k, v)
 
   let remove t k =
     try
