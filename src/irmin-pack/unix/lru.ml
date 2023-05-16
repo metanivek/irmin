@@ -81,13 +81,14 @@ module Make_lru (K : Key) : S with type 'a key = 'a K.t = struct
     if lru_enabled t = false then ()
     else
       let add w =
-        let v = (Key.Pair (k, v), w) in
-        let k = Key k in
-        t.total_weight <- t.total_weight + w;
-        Lru.add t.lru k v
+        if w < 2 then (
+          let v = (Key.Pair (k, v), w) in
+          let k = Key k in
+          t.total_weight <- t.total_weight + w;
+          Lru.add t.lru k v)
       in
       match t.weight_limit with
-      | None -> add 0
+      | None -> add (w ())
       | Some limit ->
           add (w ());
           while t.total_weight > limit do

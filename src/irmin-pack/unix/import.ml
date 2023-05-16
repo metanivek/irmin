@@ -109,7 +109,7 @@ module Mem = struct
     let x = f () in
     let after = Irmin_pack.Gc.allocated_bytes () in
     let delta = after -. before in
-    if delta > 0.0 then (
+    if delta > 500.0 then (
       Printf.eprintf "[%s] alloc bytes delta %.0f = %.0f - %.0f\n" s delta after before;
       c ());
     x

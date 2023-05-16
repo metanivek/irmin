@@ -1789,7 +1789,8 @@ struct
       if t.root then Pack_value.Kind.Inode_v2_root
       else Pack_value.Kind.Inode_v2_nonroot
 
-    let weight = Mem.reachable_bytes
+    (* let weight = Mem.reachable_bytes *)
+    let weight _  = 2
     let hash t = Bin.hash t
     let step_to_bin = T.step_to_bin_string
     let step_of_bin = T.step_of_bin_string
