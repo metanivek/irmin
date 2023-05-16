@@ -27,7 +27,7 @@ module type S = sig
 
   val create : Irmin.Backend.Conf.t -> t
 
-  val add : t -> key -> (unit -> int) -> value -> unit
+  val add : t -> key -> int -> value -> unit
   (** [add t key weight value] maps [value] with [weight] to [key] in [t]. *)
 
   val find : t -> key -> value

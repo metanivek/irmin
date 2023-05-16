@@ -55,7 +55,7 @@ struct
       include Val
     end)
 
-    let add t k v = add t k (fun () -> Val.weight v) v
+    let add t k v = add t k (Val.weight v) v
   end
 
   type file_manager = Fm.t

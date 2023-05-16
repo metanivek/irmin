@@ -18,18 +18,11 @@ open Import
 
 module type S = sig
   type t
-  (** An LRU that support memory-bound capacity via configuration key
-      [lru_max_memory]. Falls back to entry-based capacity via [lru_size]
-      configuration key, if max memory is not configured. *)
-
   type key = int63
   type value
 
   val create : Irmin.Backend.Conf.t -> t
-
-  val add : t -> key -> (unit -> int) -> value -> unit
-  (** [add t key weight value] maps [value] with [weight] to [key] in [t]. *)
-
+  val add : t -> key -> int -> value -> unit
   val find : t -> key -> value
   val mem : t -> key -> bool
   val clear : t -> unit
@@ -43,12 +36,11 @@ end)
 
 module Make (Val : Pack_value.Persistent) = struct
   type key = int63
-    type value = Val.t
-
-  type weighted_value = { v : value; weight : int }
+  type value = Val.t
+  (* type weighted_value = { v : value; weight : int } *)
 
   type t = {
-    lru : weighted_value Internal.t;
+    lru : value Internal.t;
     weight_limit : int option;
     mutable total_weight : int;
   }
@@ -68,28 +60,30 @@ module Make (Val : Pack_value.Persistent) = struct
     let lru = Internal.create lru_size in
     { lru; weight_limit; total_weight = 0 }
 
-  let lru_enabled t = match t.weight_limit with None -> true | Some x -> x > 0
+  (* let lru_enabled t = match t.weight_limit with None -> true | Some x -> x > 0 *)
 
   let add t k w v =
-    if lru_enabled t = false then ()
-    else
-      let add t k v w =
-        let n = { v; weight = w } in
-        t.total_weight <- t.total_weight + w;
-        Internal.add t.lru k n
-      in
-      match t.weight_limit with
-      | None -> add t k v 0
-      | Some limit ->
-          add t k v (w ());
-          while t.total_weight > limit do
-            match Internal.drop t.lru with
-            | None -> t.total_weight <- 0
-            | Some n -> t.total_weight <- t.total_weight - n.weight
-          done
+    ignore w;
+    Internal.add t.lru k v
+  (* if lru_enabled t = false then () *)
+  (* else *)
+  (*   let add t k v w = *)
+  (*     (\* let n = { v; weight = w } in *\) *)
+  (*     t.total_weight <- t.total_weight + w; *)
+  (*     Internal.add t.lru k v *)
+  (*   in *)
+  (*   match t.weight_limit with *)
+  (*   | None -> add t k v 0 *)
+  (*   | Some limit -> *)
+  (*       add t k v (w ()); *)
+  (*       while t.total_weight > limit do *)
+  (*         match Internal.drop t.lru with *)
+  (*         | None -> t.total_weight <- 0 *)
+  (*         | Some _ -> t.total_weight <- t.total_weight - 1 *)
+  (*         (\* garbage obvi *\) *)
+  (*       done *)
 
-  let v v = v.v
-  let find { lru; _ } k = Internal.find lru k |> v
+  let find { lru; _ } k = Internal.find lru k
   let mem { lru; _ } k = Internal.mem lru k
   let clear { lru; _ } = Internal.clear lru
 end
