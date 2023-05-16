@@ -47,18 +47,23 @@ struct
   module Index = Fm.Index
   module Key = Pack_key.Make (Hash)
 
-  module Lru = Irmin.Backend.Lru.Make (struct
-    include Int63
+  module Lru = struct
+    include Lru.Make (struct
+      type hash = Hash.t
+      type key = hash Pack_key.t
 
-    let hash = Hashtbl.hash
-  end)
+      include Val
+    end)
+
+    let add t k v = add t k (fun () -> Val.weight v) v
+  end
 
   type file_manager = Fm.t
   type dict = Dict.t
   type dispatcher = Dispatcher.t
 
   type 'a t = {
-    lru : Val.t Lru.t;
+    lru : Lru.t;
     staging : Val.t Tbl.t;
     indexing_strategy : Irmin_pack.Indexing_strategy.t;
     fm : Fm.t;
@@ -120,15 +125,8 @@ struct
 
   let v ~config ~fm ~dict ~dispatcher =
     let indexing_strategy = Conf.indexing_strategy config in
-    let lru_size = Conf.lru_size config in
     let staging = Tbl.create 127 in
-    let weight v =
-      (* if a value is bigger than 10% of the total capacity,
-         we skip it by giving it a large weight. *)
-      let w = Val.weight v in
-      if w > lru_size / 10 then max_int else w
-    in
-    let lru = Lru.create ~weight lru_size in
+    let lru = Lru.create config in
     Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging);
     Fm.register_prefix_consumer fm ~after_reload:(fun () -> Ok (Lru.clear lru));
     { lru; staging; indexing_strategy; fm; dict; dispatcher }
