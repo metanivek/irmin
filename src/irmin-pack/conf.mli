@@ -68,12 +68,12 @@ type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving irmin]
     - [`Overcommit_memory] will allow writes by growing the in-memory cache
       indefinitely *)
 
-type memory = [ `Byte of int | `Megabyte of int | `Gigabyte of int ] [@@deriving irmin]
+(* type memory = [ `Byte of int | `Megabyte of int | `Gigabyte of int ] [@@deriving irmin] *)
 
 module Key : sig
   val fresh : bool Irmin.Backend.Conf.key
   val lru_size : int Irmin.Backend.Conf.key
-  val lru_max_memory : memory option Irmin.Backend.Conf.key
+  val lru_max_memory : int option Irmin.Backend.Conf.key
   val index_log_size : int Irmin.Backend.Conf.key
   val readonly : bool Irmin.Backend.Conf.key
   val root : string Irmin.Backend.Conf.key
@@ -94,7 +94,7 @@ val lru_size : Irmin.Backend.Conf.t -> int
 (** Maximum size, in number of entries, of LRU cache. Default [100_000]. Unused
     if {!lru_max_memory} is set. *)
 
-val lru_max_memory : Irmin.Backend.Conf.t -> memory option
+val lru_max_memory : Irmin.Backend.Conf.t -> int option
 (** Maximum memory for the LRU cache to use. Default [None], which falls back to
     {!lru_size} for LRU limit. *)
 
@@ -144,7 +144,7 @@ val init :
   ?fresh:bool ->
   ?readonly:bool ->
   ?lru_size:int ->
-  ?lru_max_memory:memory option ->
+  ?lru_max_memory:int option ->
   ?index_log_size:int ->
   ?merge_throttle:merge_throttle ->
   ?indexing_strategy:Indexing_strategy.t ->

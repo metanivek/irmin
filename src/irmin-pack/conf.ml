@@ -48,8 +48,8 @@ let spec = Spec.v "pack"
 
 type merge_throttle = [ `Block_writes | `Overcommit_memory ] [@@deriving irmin]
 
-type memory = [ `Byte of int | `Megabyte of int | `Gigabyte of int ]
-[@@deriving irmin]
+(* type memory = [ `Byte of int | `Megabyte of int | `Gigabyte of int ] *)
+(* [@@deriving irmin] *)
 
 module Key = struct
   let fresh =
@@ -63,7 +63,7 @@ module Key = struct
   let lru_max_memory =
     key ~spec ~doc:"Maximum memory of the LRU cache for pack entries."
       "lru-size"
-      Irmin.Type.(option memory_t)
+      Irmin.Type.(option int)
       Default.lru_max_memory
 
   let index_log_size =
