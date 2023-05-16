@@ -86,13 +86,14 @@ module Make (H : Hashtbl.HashedType) = struct
   let create ?(weight = function _ -> 1) cap =
     { cap; w = 0; ht = HT.create cap; q = Q.create (); weight }
 
-  let drop_lru t =
+  let drop t =
     match t.q.first with
-    | None -> ()
+    | None -> None
     | Some ({ Q.value = k, v; _ } as n) ->
         t.w <- t.w - t.weight v;
         HT.remove t.ht k;
-        Q.detach t.q n
+        Q.detach t.q n;
+        Some v
 
   let remove t k =
     try
@@ -113,7 +114,7 @@ module Make (H : Hashtbl.HashedType) = struct
       else (
         t.w <- t.w + w;
         while t.w > t.cap do
-          drop_lru t
+          ignore (drop t)
         done;
         HT.add t.ht k n;
         Q.append t.q n))
