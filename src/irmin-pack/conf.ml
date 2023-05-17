@@ -156,7 +156,8 @@ let init ?(fresh = Default.fresh) ?(readonly = Default.readonly)
   let config = add config Key.lower_root lower_root in
   let config = add config Key.fresh fresh in
   let config = add config Key.lru_size lru_size in
-  let config = add config Key.lru_max_memory lru_max_memory in
+  ignore lru_max_memory;
+  (* let config = add config Key.lru_max_memory lru_max_memory in *)
   let config = add config Key.index_log_size index_log_size in
   let config = add config Key.readonly readonly in
   let config = add config Key.merge_throttle merge_throttle in
