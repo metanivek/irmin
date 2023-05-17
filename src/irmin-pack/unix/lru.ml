@@ -41,7 +41,7 @@ let create config =
   let lru_max_memory = Irmin_pack.Conf.lru_max_memory config in
   let lru_size, weight_limit =
     match lru_max_memory with
-    | None -> (Irmin_pack.Conf.lru_size config, None)
+    | None -> (Irmin_pack.Conf.lru_size config * 3, None)
     | Some b -> (-42, calculate_weight_limit b |> Option.some)
   in
   let lru = Internal.create lru_size in
