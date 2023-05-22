@@ -66,3 +66,5 @@ val incr_inode_rec_remove : unit -> unit
 val incr_inode_to_binv : unit -> unit
 val incr_inode_decode_bin : unit -> unit
 val incr_inode_encode_bin : unit -> unit
+val add_inode_size_ratio : float -> unit
+val get_avg_inode_size_ratio : unit -> float

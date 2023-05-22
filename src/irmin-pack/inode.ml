@@ -1790,7 +1790,18 @@ struct
       else Pack_value.Kind.Inode_v2_nonroot
 
     let repr_size = Mem.repr_size t
-    let weight t = 5 * repr_size t
+    let repr_size_adjust = 5
+
+    let capture_size_ratio =
+      Sys.getenv_opt "CAPTURE_INODE_SIZE_RATIO" |> Option.is_some
+
+    let weight t =
+      let base_repr_size = repr_size t in
+      (if capture_size_ratio then
+       let obj_size = Mem.reachable_bytes t in
+       Stats.add_inode_size_ratio
+       @@ (Float.of_int obj_size /. Float.of_int base_repr_size));
+      repr_size_adjust * base_repr_size
 
     let hash t = Bin.hash t
     let step_to_bin = T.step_to_bin_string

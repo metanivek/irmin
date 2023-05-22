@@ -510,6 +510,13 @@ module Make (Store : Store) = struct
         [%logs.app "Closing repo..."];
         let+ () = Store.Repo.close repo in
         Stat_collector.close stats;
+        (match Sys.getenv_opt "CAPTURE_INODE_SIZE_RATIO" with
+        | None -> ()
+        | Some _ ->
+            let avg_inode_size_ratio =
+              Irmin_pack.Stats.get_avg_inode_size_ratio ()
+            in
+            [%logs.app "Avg inode size ratio: %f" avg_inode_size_ratio]);
         match config.return_type with
         | Unit -> (() : a)
         | Summary ->

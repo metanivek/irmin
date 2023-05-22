@@ -94,23 +94,45 @@ module Inode = struct
 end
 
 type t = { inode : Inode.stat }
+type inode_size_ratio = { total : float; count : int }
 
-let s = { inode = Inode.init () }
-let get () = s
-let reset_stats () = Inode.clear s.inode
-let incr_inode_add () = Inode.update ~field:Inode.Inode_add s.inode
-let incr_inode_remove () = Inode.update ~field:Inode.Inode_remove s.inode
-let incr_inode_of_seq () = Inode.update ~field:Inode.Inode_of_seq s.inode
-let incr_inode_of_raw () = Inode.update ~field:Inode.Inode_of_raw s.inode
-let incr_inode_rec_add () = Inode.update ~field:Inode.Inode_rec_add s.inode
+let default_inode_size_ratio = { total = 0.0; count = 0 }
+
+type priv = { mutable inode_size_ratio : inode_size_ratio }
+
+let t = { inode = Inode.init () }
+let priv = { inode_size_ratio = default_inode_size_ratio }
+let get () = t
+
+let reset_stats () =
+  Inode.clear t.inode;
+  priv.inode_size_ratio <- default_inode_size_ratio
+
+let incr_inode_add () = Inode.update ~field:Inode.Inode_add t.inode
+let incr_inode_remove () = Inode.update ~field:Inode.Inode_remove t.inode
+let incr_inode_of_seq () = Inode.update ~field:Inode.Inode_of_seq t.inode
+let incr_inode_of_raw () = Inode.update ~field:Inode.Inode_of_raw t.inode
+let incr_inode_rec_add () = Inode.update ~field:Inode.Inode_rec_add t.inode
 
 let incr_inode_rec_remove () =
-  Inode.update ~field:Inode.Inode_rec_remove s.inode
+  Inode.update ~field:Inode.Inode_rec_remove t.inode
 
-let incr_inode_to_binv () = Inode.update ~field:Inode.Inode_to_binv s.inode
+let incr_inode_to_binv () = Inode.update ~field:Inode.Inode_to_binv t.inode
 
 let incr_inode_decode_bin () =
-  Inode.update ~field:Inode.Inode_decode_bin s.inode
+  Inode.update ~field:Inode.Inode_decode_bin t.inode
 
 let incr_inode_encode_bin () =
-  Inode.update ~field:Inode.Inode_encode_bin s.inode
+  Inode.update ~field:Inode.Inode_encode_bin t.inode
+
+let add_inode_size_ratio ratio =
+  priv.inode_size_ratio <-
+    {
+      total = priv.inode_size_ratio.total +. ratio;
+      count = priv.inode_size_ratio.count + 1;
+    }
+
+let get_avg_inode_size_ratio () =
+  match priv.inode_size_ratio.count with
+  | 0 -> 0.0
+  | c -> priv.inode_size_ratio.total /. Float.of_int c
