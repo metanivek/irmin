@@ -87,7 +87,7 @@ module Make (H : Hashtbl.HashedType) = struct
   let weight t = t.w
 
   let create cap =
-    let cap, ht_cap = if cap < 0 then (Uncapped, 1024) else (Capped cap, cap) in
+    let cap, ht_cap = if cap < 0 then (Uncapped, 65536) else (Capped cap, cap) in
     { cap; w = 0; ht = HT.create ht_cap; q = Q.create () }
 
   let drop t =
