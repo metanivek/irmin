@@ -138,6 +138,7 @@ module Make (Io : Io.S) = struct
     let open Result_syntax in
     let* mapping = Mapping_file.open_map ~path:mapping ~size:mapping_size in
     let+ data = Io.open_ ~path:data ~readonly in
+    Io.dont_need data;
     { mapping; data }
 
   let open_ro ~mapping_size ~mapping ~data =

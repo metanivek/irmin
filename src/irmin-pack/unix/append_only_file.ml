@@ -79,6 +79,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
       ~auto_flush_procedure =
     let open Result_syntax in
     let* io = Io.open_ ~path ~readonly:false in
+    Io.dont_need io;
     let+ () = check_consistent_store ~end_poff ~dead_header_size io in
     let persisted_end_poff = end_poff in
     let dead_header_size = Int63.of_int dead_header_size in
@@ -93,6 +94,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
   let open_ro ~path ~end_poff ~dead_header_size =
     let open Result_syntax in
     let* io = Io.open_ ~path ~readonly:true in
+    Io.dont_need io;
     let+ () = check_consistent_store ~end_poff ~dead_header_size io in
     let persisted_end_poff = end_poff in
     let dead_header_size = Int63.of_int dead_header_size in

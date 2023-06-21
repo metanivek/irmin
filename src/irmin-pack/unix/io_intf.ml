@@ -127,6 +127,8 @@ module type S = sig
   val path : t -> string
   val page_size : int
 
+  val dont_need: t -> unit
+
   (** {1 Unsafe Functions}
 
       These functions are equivalents to exising safe ones, but using exceptions
