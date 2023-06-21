@@ -243,3 +243,5 @@ module Of_storage (M : Storage.Make) (H : Hash.S) (V : Contents.S) = struct
     module Commit = Commit.Make (Hash)
   end)
 end
+
+module Dump = Dump

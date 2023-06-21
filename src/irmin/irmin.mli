@@ -502,3 +502,5 @@ module Dot (S : Generic_key.S) : Dot.S with type db = S.t
 
 module Metrics = Metrics
 (** Type agnostics mechanisms to manipulate metrics. *)
+
+module Dump = Dump
