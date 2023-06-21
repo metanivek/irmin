@@ -509,7 +509,10 @@ module Make (P : Backend.S) = struct
     let add_to_findv_cache t step v =
       match t.info.findv_cache with
       | None -> t.info.findv_cache <- Some (StepMap.singleton step v)
-      | Some m -> t.info.findv_cache <- Some (StepMap.add step v m)
+      | Some m ->
+          let m = StepMap.add step v m in
+          t.info.findv_cache <- Some m;
+          Dump.set "add_to_findv_cache" 0 (StepMap.cardinal m)
 
     let clear_info_fields i =
       if not (info_is_empty i) then (
@@ -1184,6 +1187,7 @@ module Make (P : Backend.S) = struct
           Portable_value.is_empty_after_updates ~cache p um
 
     let findv_aux ~cache ~value_of_key ~return ~bind:( let* ) ctx t step =
+      let dump = Dump.add "tree_findv_aux" in
       let of_map m = try Some (StepMap.find step m) with Not_found -> None in
       let of_value = Regular_value.findv ~cache ~env:t.info.env step t in
       let of_portable = Portable_value.findv ~cache ~env:t.info.env step t () in
@@ -1208,29 +1212,51 @@ module Make (P : Backend.S) = struct
               | `pruned ]
               Scan.t)
         with
-        | Map m -> return (of_map m)
-        | Repo_value (repo, v) -> return (of_value repo v)
+        | Map m ->
+            dump 0;
+            return (of_map m)
+        | Repo_value (repo, v) ->
+            dump 1;
+            return (of_value repo v)
         | Repo_key (repo, k) ->
+            dump 2;
             let* v = value_of_key ~cache t repo k in
             let v = get_ok ctx v in
             return (of_value repo v)
         | Value_dirty (repo, v, um) -> (
             match StepMap.find_opt step um with
-            | Some (Add v) -> return (Some v)
-            | Some Remove -> return None
-            | None -> return (of_value repo v))
-        | Portable p -> return (of_portable p)
+            | Some (Add v) ->
+                dump 3;
+                return (Some v)
+            | Some Remove ->
+                dump 3;
+                return None
+            | None ->
+                dump 1;
+                return (of_value repo v))
+        | Portable p ->
+            dump 4;
+            return (of_portable p)
         | Portable_dirty (p, um) -> (
+            dump 5;
             match StepMap.find_opt step um with
             | Some (Add v) -> return (Some v)
             | Some Remove -> return None
             | None -> return (of_portable p))
-        | Pruned h -> pruned_hash_exn ctx h
+        | Pruned h ->
+            dump 6;
+            pruned_hash_exn ctx h
       in
       match t.info.findv_cache with
       | None -> of_t ()
       | Some m -> (
-          match of_map m with None -> of_t () | Some _ as r -> return r)
+          match of_map m with
+          | None ->
+              Dump.add "tree_findv_cache" 0;
+              of_t ()
+          | Some _ as r ->
+              Dump.add "tree_findv_cache" 1;
+              return r)
 
     let findv = findv_aux ~value_of_key ~return:Lwt.return ~bind:Lwt.bind
 
