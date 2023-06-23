@@ -128,6 +128,7 @@ module type S = sig
   val page_size : int
 
   val dont_need: t -> unit
+  val no_reuse: t -> unit
 
   (** {1 Unsafe Functions}
 
