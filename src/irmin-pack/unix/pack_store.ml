@@ -310,15 +310,18 @@ struct
   let find_in_pack_file ~key_of_offset t key =
     let off, len, volume_identifier = get_location t key in
     let buf = Bytes.create len in
+    let c0 = Mtime_clock.counter () in
     let volume_identifier =
       Dispatcher.read_exn t.dispatcher ~off ~len ?volume_identifier buf
     in
+    let read_duration = Mtime_clock.count c0 |> Mtime.span_to_us in
     if gced t buf then None
     else
       let () = Pack_key.set_volume_identifier_exn ~volume_identifier key in
       let key_of_offset = key_of_offset ?volume_identifier t in
       let key_of_hash = Pack_key.v_indexed in
       let dict = Dict.find t.dict in
+      let c0 = Mtime_clock.counter () in
       let v =
         (* Bytes.unsafe_to_string usage: buf created, uniquely owned; after
            creation, we assume Dispatcher.read_if_not_gced returns unique
@@ -328,6 +331,23 @@ struct
           (Bytes.unsafe_to_string buf)
           (ref 0)
       in
+      let decode_duration = Mtime_clock.count c0 |> Mtime.span_to_us in
+      let name =
+        match Val.kind v with
+        | Commit_v1 | Commit_v2 -> "commit"
+        | Inode_v1_unstable | Inode_v1_stable | Inode_v2_root | Inode_v2_nonroot
+          ->
+            "inode"
+        | Contents -> "contents"
+        | _ -> assert false
+      in
+      Irmin.Dump.set_arr "find_in_pack"
+        [|
+          name;
+          string_of_int len;
+          string_of_float read_duration;
+          string_of_float decode_duration;
+        |];
       Some v
 
   let find_in_pack_file ~key_of_offset t key =
