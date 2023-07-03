@@ -1,10 +1,8 @@
-module H = Hashtbl.Make (String)
-
-let h = H.create 64
+let h: (string, Out_channel.t * int) Hashtbl.t = Hashtbl.create 64
 
 let open_ name path n =
   let ch = Out_channel.open_text path in
-  H.add h name (ch, n)
+  Hashtbl.add h name (ch, n)
 
 let row arr =
   let n = Array.length arr in
@@ -22,7 +20,7 @@ let make_row c n v =
   row arr
 
 let set_row name v =
-  match H.find_opt h name with
+  match Hashtbl.find_opt h name with
   | None -> ()
   | Some (ch, n) ->
       let r =
@@ -44,7 +42,7 @@ let set_float name col v = set name col (string_of_float v)
 let add name col = set_int name col 1
 
 let close () =
-  H.iter
+  Hashtbl.iter
     (fun _ (ch, _) ->
       Out_channel.flush ch;
       Out_channel.close ch)
