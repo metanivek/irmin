@@ -512,7 +512,7 @@ module Make (P : Backend.S) = struct
       | Some m ->
           let m = StepMap.add step v m in
           t.info.findv_cache <- Some m;
-          Dump.set "add_to_findv_cache" 0 (StepMap.cardinal m)
+          Dump.set_int "add_to_findv_cache" 0 (StepMap.cardinal m)
 
     let clear_info_fields i =
       if not (info_is_empty i) then (

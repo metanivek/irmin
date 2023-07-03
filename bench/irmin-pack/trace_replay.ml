@@ -481,12 +481,14 @@ module Make (Store : Store) = struct
       open_commit_sequence config.number_of_commits_to_replay
         config.path_conversion config.replay_trace_path
     in
-    Irmin.Dump.open_ "tree_findv_aux"
-      "/home/metanivek/code/irmin/tree_findv_aux.csv" 7;
-    Irmin.Dump.open_ "tree_findv_cache"
-      "/home/metanivek/code/irmin/tree_findv_cache.csv" 2;
-    Irmin.Dump.open_ "add_to_findv_cache"
-      "/home/metanivek/code/irmin/add_to_findv_cache.csv" 1;
+    (* Irmin.Dump.open_ "tree_findv_aux" *)
+    (*   "/home/metanivek/code/irmin/tree_findv_aux.csv" 7; *)
+    (* Irmin.Dump.open_ "tree_findv_cache" *)
+    (*   "/home/metanivek/code/irmin/tree_findv_cache.csv" 2; *)
+    (* Irmin.Dump.open_ "add_to_findv_cache" *)
+    (*   "/home/metanivek/code/irmin/add_to_findv_cache.csv" 1; *)
+    Irmin.Dump.open_ "find_in_pack"
+      "/home/metanivek/code/irmin/find_in_pack_2.csv" 4;
     let root = Filename.concat config.artefacts_path "root" in
     let* repo, on_commit, on_end = Store.create_repo ~root ext_config in
     prepare_artefacts_dir config.artefacts_path;
