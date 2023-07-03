@@ -314,7 +314,7 @@ struct
     let volume_identifier =
       Dispatcher.read_exn t.dispatcher ~off ~len ?volume_identifier buf
     in
-    let read_duration = Mtime_clock.count c0 |> Mtime.span_to_us in
+    let read_duration = Mtime_clock.count c0 |> Mtime.Span.to_us in
     if gced t buf then None
     else
       let () = Pack_key.set_volume_identifier_exn ~volume_identifier key in
@@ -331,7 +331,7 @@ struct
           (Bytes.unsafe_to_string buf)
           (ref 0)
       in
-      let decode_duration = Mtime_clock.count c0 |> Mtime.span_to_us in
+      let decode_duration = Mtime_clock.count c0 |> Mtime.Span.to_us in
       let name =
         match Val.kind v with
         | Commit_v1 | Commit_v2 -> "commit"
