@@ -348,7 +348,7 @@ struct
           string_of_float read_duration;
           string_of_float decode_duration;
         |];
-      Some v
+      Some (v, name, len)
 
   let find_in_pack_file ~key_of_offset t key =
     try find_in_pack_file ~key_of_offset t key with
@@ -380,18 +380,23 @@ struct
     let find_in_pack_file_guarded ~is_indexed =
       let res = find_in_pack_file ~key_of_offset t k in
       Option.iter
-        (fun v ->
+        (fun (v, name, len) ->
           if is_indexed then find_location := Stats.Pack_store.Pack_indexed
           else find_location := Stats.Pack_store.Pack_direct;
           Lru.add t.lru (off_of_direct_key k) v;
-          if check_integrity then
-            check_key k v |> function
+          if check_integrity then (
+            let c0 = Mtime_clock.counter () in
+            let r = check_key k v in
+            let check_duration = Mtime_clock.count c0 |> Mtime.Span.to_us in
+            Irmin.Dump.set_arr "integrity_check"
+              [| name; string_of_int len; string_of_float check_duration |];
+            match r with
             | Ok () -> ()
             | Error (expected, got) ->
                 corrupted_store "Got hash %a, expecting %a (for val: %a)."
-                  pp_hash got pp_hash expected pp_value v)
+                  pp_hash got pp_hash expected pp_value v))
         res;
-      res
+      res |> Option.map (fun (v, _, _) -> v)
     in
     let value_opt =
       match Pack_key.inspect k with
@@ -421,7 +426,7 @@ struct
 
   let unsafe_find_no_prefetch t key =
     let key_of_offset ?volume_identifier:_ _ = Pack_key.v_offset in
-    find_in_pack_file ~key_of_offset t key
+    find_in_pack_file ~key_of_offset t key |> Option.map (fun (v, _, _) -> v)
 
   let find t k =
     let v = unsafe_find ~check_integrity:true t k in
@@ -435,7 +440,7 @@ struct
         Error `Absent_value
     | exception Invalid_read _ -> Error `Absent_value
     | None -> Error `Wrong_hash
-    | Some value -> (
+    | Some (value, _, _) -> (
         match check_hash hash value with
         | Ok () -> Ok ()
         | Error _ -> Error `Wrong_hash)

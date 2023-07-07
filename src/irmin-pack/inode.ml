@@ -2353,7 +2353,10 @@ struct
           check_depth_opt ~expected_depth v;
           v
         in
+        let c0 = Mtime_clock.counter () in
         let v = Val.of_raw find v in
+        let of_raw_duration = Mtime_clock.count c0 |> Mtime.Span.to_us in
+        Irmin.Dump.set_arr "inode_of_raw" [| string_of_float of_raw_duration |];
         Some v
 
   let find t k = unsafe_find ~check_integrity:true t k |> Lwt.return
