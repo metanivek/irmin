@@ -1183,10 +1183,10 @@ module Make (P : Backend.S) = struct
       | Portable_dirty (p, um) ->
           Portable_value.is_empty_after_updates ~cache p um
 
+    let findv_aux_of_map m step =
+      try Some (StepMap.find step m) with Not_found -> None
+
     let findv_aux ~cache ~value_of_key ~return ~bind:( let* ) ctx t step =
-      let of_map m = try Some (StepMap.find step m) with Not_found -> None in
-      let of_value = Regular_value.findv ~cache ~env:t.info.env step t in
-      let of_portable = Portable_value.findv ~cache ~env:t.info.env step t () in
       let of_t () =
         match
           (Scan.cascade t
@@ -1208,31 +1208,41 @@ module Make (P : Backend.S) = struct
               | `pruned ]
               Scan.t)
         with
-        | Map m -> return (of_map m)
-        | Repo_value (repo, v) -> return (of_value repo v)
+        | Map m -> return (findv_aux_of_map m step)
+        | Repo_value (repo, v) ->
+            return (Regular_value.findv ~cache ~env:t.info.env step t repo v)
         | Repo_key (repo, k) ->
             let* v = value_of_key ~cache t repo k in
             let v = get_ok ctx v in
-            return (of_value repo v)
+            return (Regular_value.findv ~cache ~env:t.info.env step t repo v)
         | Value_dirty (repo, v, um) -> (
             match StepMap.find_opt step um with
             | Some (Add v) -> return (Some v)
             | Some Remove -> return None
-            | None -> return (of_value repo v))
-        | Portable p -> return (of_portable p)
+            | None ->
+                return
+                  (Regular_value.findv ~cache ~env:t.info.env step t repo v))
+        | Portable p ->
+            return (Portable_value.findv ~cache ~env:t.info.env step t () p)
         | Portable_dirty (p, um) -> (
             match StepMap.find_opt step um with
             | Some (Add v) -> return (Some v)
             | Some Remove -> return None
-            | None -> return (of_portable p))
+            | None ->
+                return (Portable_value.findv ~cache ~env:t.info.env step t () p)
+            )
         | Pruned h -> pruned_hash_exn ctx h
       in
       match t.info.findv_cache with
       | None -> of_t ()
       | Some m -> (
-          match of_map m with None -> of_t () | Some _ as r -> return r)
+          match findv_aux_of_map m step with
+          | None -> of_t ()
+          | Some _ as r -> return r)
 
-    let findv = findv_aux ~value_of_key ~return:Lwt.return ~bind:Lwt.bind
+    let findv ~cache ctx t path =
+      findv_aux ~value_of_key ~return:Lwt.return ~bind:Lwt.bind ~cache ctx t
+        path
 
     let seq_of_map ?(offset = 0) ?length m : (step * elt) Seq.t =
       let take seq =

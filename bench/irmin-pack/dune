@@ -79,7 +79,8 @@
   ppx_repr
   bench_common
   irmin-tezos
-  irmin_traces))
+  irmin_traces
+  memtrace))
 
 (executable
  (name trace_stats)

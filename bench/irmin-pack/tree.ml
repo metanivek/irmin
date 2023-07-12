@@ -649,6 +649,7 @@ let deprecated_exit = (Term.exit [@alert "-deprecated"])
 let deprecated_eval = (Term.eval [@alert "-deprecated"])
 
 let () =
+  (* Memtrace.trace_if_requested (); *)
   let man =
     [
       `S "DESCRIPTION";
